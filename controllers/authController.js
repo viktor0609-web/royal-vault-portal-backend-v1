@@ -61,7 +61,7 @@ export const registerUser = async (req, res) => {
     });
 
     // Send the verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
     const htmlContent = `
       <h2>Welcome to our platform, ${username}!</h2>
       <p>Please verify your email by clicking the link below:</p>
@@ -148,8 +148,13 @@ export const logoutUser = async (req, res) => {
 
 // Profile
 export const getProfile = async (req, res) => {
-  const user = await User.findById(req.user.id).select("-password -refreshToken");
-  res.json(user);
+  try {
+    const user = await User.findById(req.user.id).select("-password -refreshToken");
+    res.json(user);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+
 };
 
 // Forgot password
@@ -167,6 +172,8 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
     // Optional: send your own email logic here
+    console.log(resetUrl); // For testing purposes
+    
 
     res.json({ message: "Password reset email sent." });
   } catch (e) {
