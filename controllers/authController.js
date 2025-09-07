@@ -6,8 +6,6 @@ import Hubspot from "@hubspot/api-client";
 import axios from "axios";
 import sendEmail from "../utils/sendEmail.js";
 
-const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
-
 // Base HubSpot API URL
 const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
 // Generate JWT tokens
@@ -52,6 +50,8 @@ export const registerUser = async (req, res) => {
       },
     };
 
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
+
     // Send POST request to HubSpot API
     await axios.post(HUBSPOT_API_URL, hubSpotContact, {
       headers: {
@@ -68,10 +68,15 @@ export const registerUser = async (req, res) => {
       <a href="${verificationUrl}">Verify Email</a>
     `;
 
+    console.log(htmlContent);
+
     await sendEmail(email, "Email Verification", "Please verify your email.", htmlContent);
 
     res.status(201).json({ message: "Registered. Please verify your email." });
   } catch (e) {
+
+    console.log(e);
+    
     res.status(500).json({ message: e.message });
   }
 };
