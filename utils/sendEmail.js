@@ -32,5 +32,6 @@ const sendEmail = async (to, subject, html) => {
     console.error("Email sending failed (SendGrid):", error.response?.body || error);
   }
 };
+ 
 
 export default sendEmail;
