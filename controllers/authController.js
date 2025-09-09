@@ -21,22 +21,21 @@ const generateRefreshToken = (id, role) =>
 // Register user & create HubSpot contact
 export const registerUser = async (req, res) => {
   try {
-    const { username, email, phone, password, role } = req.body;
-    if (!username || !email || !phone || !password) {
+    const { username, email, phone, role } = req.body;
+    if (!username || !email || !phone) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) return res.status(400).json({ message: "User already exists" });
 
-    const hashed = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
     const user = await User.create({
       username,
       email,
       phone,
-      password: hashed,
+      password:123456,
       role: role || "user",
       verificationToken,
     });
@@ -53,24 +52,21 @@ export const registerUser = async (req, res) => {
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
 
     // Send POST request to HubSpot API
-    await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+    //   headers: {
+    //     Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+    //     "Content-Type": "application/json",
+    //   },
+    // });
 
     // Send the verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
-    const htmlContent = `
-      <h2>Welcome to our platform, ${username}!</h2>
-      <p>Please verify your email by clicking the link below:</p>
-      <a href="${verificationUrl}">Verify Email</a>
-    `;
 
-    console.log(htmlContent);
 
-    await sendEmail(email, "Email Verification", "Please verify your email.", htmlContent);
+    const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
+    console.log(templateId);
+    
+    await sendEmail(email, username, verificationUrl, templateId);
 
     res.status(201).json({ message: "Registered. Please verify your email." });
   } catch (e) {
@@ -86,10 +82,12 @@ export const registerUser = async (req, res) => {
 export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
+    const { password } = req.body;
     const user = await User.findOne({ verificationToken: token });
     if (!user) return res.status(400).json({ message: "Invalid or expired token" });
     user.isVerified = true;
     user.verificationToken = null;
+    user.password = await bcrypt.hash("password", 10);
     await user.save();
     res.json({ message: "Email verified successfully." });
   } catch (e) {

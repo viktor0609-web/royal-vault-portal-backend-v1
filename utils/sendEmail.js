@@ -1,24 +1,16 @@
 import sgMail from "@sendgrid/mail";
 
 
-
-/**
- * Send email via SendGrid
- * 
- * @param {string} to - Recipient email
- * @param {string} subject - Email subject
- * @param {string} html - HTML content of email
- */
-const sendEmail = async (to, subject, html) => {
+const sendEmail = async (to, firstName, url, templateId) => {
   try {
 
     const msg = {
       to,
-      templateId: process.env.TEMPLATE_ID,
+      templateId:templateId,
       from: process.env.SENDGRID_FROM_EMAIL, // must be verified sender
       dynamic_template_data: {
-        subject,
-        html,
+        firstName,
+        url,
       }
     };
 
