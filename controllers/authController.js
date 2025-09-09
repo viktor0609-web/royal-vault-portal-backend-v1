@@ -61,11 +61,7 @@ export const registerUser = async (req, res) => {
 
     // Send the verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
-
-
-    const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
-    console.log(templateId);
-    
+    const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;   
     await sendEmail(email, username, verificationUrl, templateId);
 
     res.status(201).json({ message: "Registered. Please verify your email." });
@@ -169,9 +165,8 @@ export const forgotPassword = async (req, res) => {
 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-    // Optional: send your own email logic here
-    console.log(resetUrl); // For testing purposes
-    
+    const templateId = process.env.PASSWORD_RESET_TEMPLATE_ID;   
+    await sendEmail(email, user.username, resetUrl, templateId);   
 
     res.json({ message: "Password reset email sent." });
   } catch (e) {
