@@ -1,0 +1,126 @@
+{
+  "info": {
+    "name": "Deals API",
+    "_postman_id": "a1b2c3d4-e5f6-7890-1234-56789abcdef0",
+    "description": "Postman collection for testing Deals API with multi-select fields",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Deal",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Super Deal\",\n  \"categoryIds\": [\"64f0a1f1a0c1a23a1b2c3d4e\",\"64f0a1f1a0c1a23a1b2c3d5f\"],\n  \"subCategoryIds\": [\"64f0a2b1a0c1a23a1b2c3d6f\"],\n  \"typeIds\": [\"64f0a3c1a0c1a23a1b2c3d7f\"],\n  \"strategyIds\": [\"64f0a4d1a0c1a23a1b2c3d8f\"],\n  \"requirementIds\": [\"64f0a5e1a0c1a23a1b2c3d9f\"],\n  \"sourceId\": \"64f0a6f1a0c1a23a1b2c3daf\",\n  \"createdBy\": \"64f0a7g1a0c1a23a1b2c3dbf\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/deals",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["deals"]
+        }
+      }
+    },
+    {
+      "name": "Get All Deals",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/deals",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["deals"]
+        }
+      }
+    },
+    {
+      "name": "Get Deal by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/deals/:dealId",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["deals", ":dealId"]
+        }
+      }
+    },
+    {
+      "name": "Update Deal",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Updated Super Deal\",\n  \"categoryIds\": [\"64f0a1f1a0c1a23a1b2c3d4e\"],\n  \"typeIds\": [\"64f0a3c1a0c1a23a1b2c3d7f\",\"64f0a3c1a0c1a23a1b2c3d8f\"]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/deals/:dealId",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["deals", ":dealId"]
+        }
+      }
+    },
+    {
+      "name": "Delete Deal",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/deals/:dealId",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["deals", ":dealId"]
+        }
+      }
+    },
+    {
+      "name": "Filter Deals",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/deals/filter?categoryIds=64f0a1f1a0c1a23a1b2c3d4e,64f0a1f1a0c1a23a1b2c3d5f&typeIds=64f0a3c1a0c1a23a1b2c3d7f&name=Super",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["deals", "filter"],
+          "query": [
+            {
+              "key": "categoryIds",
+              "value": "64f0a1f1a0c1a23a1b2c3d4e,64f0a1f1a0c1a23a1b2c3d5f"
+            },
+            {
+              "key": "typeIds",
+              "value": "64f0a3c1a0c1a23a1b2c3d7f"
+            },
+            {
+              "key": "name",
+              "value": "Super"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,21 +1,20 @@
 import SubCategory from '../models/SubCategory.js';
-import Category from '../models/Category.js';
 
 // Create a new subcategory
-export const createSubCategory  = async (req, res) => {
+export const createSubCategory = async (req, res) => {
   try {
-    const { name, categoryId } = req.body;
+    const { name } = req.body;
 
-    if (!name || !categoryId) {
-      return res.status(400).json({ message: 'Name and Category ID are required' });
+    if (!name) {
+      return res.status(400).json({ message: 'Name is required' });
     }
 
-    const category = await Category.findById(categoryId);
-    if (!category) {
-      return res.status(404).json({ message: 'Category not found' });
+    const existing = await SubCategory.findOne({ name });
+    if (existing) {
+      return res.status(409).json({ message: 'SubCategory already exists' });
     }
 
-    const subCategory = new SubCategory({ name, category: categoryId });
+    const subCategory = new SubCategory({ name });
     await subCategory.save();
 
     return res.status(201).json({ message: 'SubCategory created successfully', subCategory });
@@ -28,7 +27,7 @@ export const createSubCategory  = async (req, res) => {
 // Get all subcategories
 export const getAllSubCategories = async (req, res) => {
   try {
-    const subCategories = await SubCategory.find().populate('category');
+    const subCategories = await SubCategory.find();
     return res.status(200).json({ message: 'SubCategories fetched successfully', subCategories });
   } catch (error) {
     console.error(error);
@@ -40,7 +39,7 @@ export const getAllSubCategories = async (req, res) => {
 export const getSubCategoryById = async (req, res) => {
   const { subCategoryId } = req.params;
   try {
-    const subCategory = await SubCategory.findById(subCategoryId).populate('category');
+    const subCategory = await SubCategory.findById(subCategoryId);
     if (!subCategory) {
       return res.status(404).json({ message: 'SubCategory not found' });
     }
@@ -55,7 +54,7 @@ export const getSubCategoryById = async (req, res) => {
 // Update a subcategory by ID
 export const updateSubCategory = async (req, res) => {
   const { subCategoryId } = req.params;
-  const { name, categoryId } = req.body;
+  const { name } = req.body;
 
   try {
     const subCategory = await SubCategory.findById(subCategoryId);
@@ -64,15 +63,8 @@ export const updateSubCategory = async (req, res) => {
     }
 
     subCategory.name = name || subCategory.name;
-    if (categoryId) {
-      const category = await Category.findById(categoryId);
-      if (!category) {
-        return res.status(404).json({ message: 'Category not found' });
-      }
-      subCategory.category = categoryId;
-    }
-
     await subCategory.save();
+
     return res.status(200).json({ message: 'SubCategory updated successfully', subCategory });
   } catch (error) {
     console.error(error);
@@ -91,7 +83,7 @@ export const deleteSubCategory = async (req, res) => {
       return res.status(404).json({ message: 'SubCategory not found' });
     }
 
-    await subCategory.remove();
+    await subCategory.deleteOne();
     return res.status(200).json({ message: 'SubCategory deleted successfully' });
   } catch (error) {
     console.error(error);
