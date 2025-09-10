@@ -1,165 +1,188 @@
-import { Course, CourseGroup } from "../models/Course.js"; // Assuming model path is correct
-import mongoose from 'mongoose';
+import { CourseGroup } from '../models/Course.js';
+import User from '../models/User.js';
 
-// Create a new Course Group
+// ------------------ CourseGroup CRUD ------------------
+
+// Create a new CourseGroup
 export const createCourseGroup = async (req, res) => {
   try {
     const { title, description, icon } = req.body;
-    const createdBy = req.user._id; // assuming user is available in the request (middleware)
-
-    const newCourseGroup = new CourseGroup({
-      title,
-      description,
-      icon,
-      createdBy,
-    });
-
-    await newCourseGroup.save();
-    res.status(201).json({ message: 'Course Group created successfully', data: newCourseGroup });
+    const createdBy = req.user._id;
+    const courseGroup = await CourseGroup.create({ title, description, icon, createdBy });
+    res.status(201).json(courseGroup);
   } catch (error) {
-    res.status(500).json({ message: 'Error creating Course Group', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Get all Course Groups
+// Get all CourseGroups (with nested courses & lectures)
 export const getAllCourseGroups = async (req, res) => {
   try {
-    const courseGroups = await CourseGroup.find().populate('createdBy', 'name email');
-    res.status(200).json({ message: 'Course Groups fetched successfully', data: courseGroups });
+    const courseGroups = await CourseGroup.find()
+      .populate('createdBy', 'name email') // populate user who created
+      .lean(); // convert to plain object
+    res.json(courseGroups);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching Course Groups', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Create a new Course
-export const createCourse = async (req, res) => {
+// Get single CourseGroup by ID (with nested courses & lectures)
+export const getCourseGroupById = async (req, res) => {
   try {
-    const { groupId, title, description, url, pdfUrl } = req.body;
-    const createdBy = req.user._id; // assuming user is available in the request (middleware)
-
-    // Check if the group exists
-    const courseGroup = await CourseGroup.findById(groupId);
-    if (!courseGroup) {
-      return res.status(400).json({ message: 'Course Group not found' });
-    }
-
-    const newCourse = new Course({
-      group: groupId,
-      title,
-      description,
-      url,
-      pdfUrl,
-      createdBy,
-    });
-
-    await newCourse.save();
-    res.status(201).json({ message: 'Course created successfully', data: newCourse });
+    const courseGroup = await CourseGroup.findById(req.params.id)
+      .populate('createdBy', 'name email')
+      .lean();
+    if (!courseGroup) return res.status(404).json({ message: 'CourseGroup not found' });
+    res.json(courseGroup);
   } catch (error) {
-    res.status(500).json({ message: 'Error creating Course', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Get all Courses by Group
-export const getCoursesByGroup = async (req, res) => {
+// Update CourseGroup
+export const updateCourseGroup = async (req, res) => {
   try {
-    const { groupId } = req.params;
-    const courses = await Course.find({ group: groupId }).populate('createdBy', 'name email').populate('group', 'title');
-    res.status(200).json({ message: 'Courses fetched successfully', data: courses });
+    const updated = await CourseGroup.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ message: 'CourseGroup not found' });
+    res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching Courses', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Get a specific Course
-export const getCourse = async (req, res) => {
+// Delete CourseGroup
+export const deleteCourseGroup = async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const course = await Course.findById(courseId).populate('createdBy', 'name email').populate('group', 'title');
-    
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-
-    res.status(200).json({ message: 'Course fetched successfully', data: course });
+    const deleted = await CourseGroup.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'CourseGroup not found' });
+    res.json({ message: 'CourseGroup deleted' });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching Course', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Update Course details
+// ------------------ Course CRUD ------------------
+
+// Add a Course to a CourseGroup
+export const addCourseToGroup = async (req, res) => {
+  try {
+    const { title, description, url } = req.body;
+    const courseGroup = await CourseGroup.findById(req.params.id);
+    if (!courseGroup) return res.status(404).json({ message: 'CourseGroup not found' });
+
+    courseGroup.courses.push({ title, description, url });
+    await courseGroup.save();
+    res.status(201).json(courseGroup);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update a Course
 export const updateCourse = async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const { title, description, url, pdfUrl } = req.body;
-    
-    const updatedCourse = await Course.findByIdAndUpdate(
-      courseId,
-      { title, description, url, pdfUrl },
-      { new: true }
-    );
+    const courseGroup = await CourseGroup.findOne({ 'courses._id': req.params.courseId });
+    if (!courseGroup) return res.status(404).json({ message: 'Course not found' });
 
-    if (!updatedCourse) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-
-    res.status(200).json({ message: 'Course updated successfully', data: updatedCourse });
+    const course = courseGroup.courses.id(req.params.courseId);
+    Object.assign(course, req.body);
+    await courseGroup.save();
+    res.json(courseGroup);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating Course', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Delete Course
+// Delete a Course
 export const deleteCourse = async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const deletedCourse = await Course.findByIdAndDelete(courseId);
+    const courseGroup = await CourseGroup.findOne({ 'courses._id': req.params.courseId });
+    if (!courseGroup) return res.status(404).json({ message: 'Course not found' });
 
-    if (!deletedCourse) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-
-    res.status(200).json({ message: 'Course deleted successfully' });
+    courseGroup.courses.id(req.params.courseId).remove();
+    await courseGroup.save();
+    res.json({ message: 'Course deleted' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting Course', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Mark course as completed by a user
-export const markCourseAsCompleted = async (req, res) => {
+// ------------------ Lecture CRUD ------------------
+
+// Add a Lecture to a Course
+export const addLectureToCourse = async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const userId = req.user._id; // assuming user is available in the request (middleware)
+    const { title, description, videoUrl, pdfUrl } = req.body;
+    const courseGroup = await CourseGroup.findOne({ 'courses._id': req.params.courseId });
+    if (!courseGroup) return res.status(404).json({ message: 'Course not found' });
 
-    const course = await Course.findById(courseId);
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-
-    if (course.completedBy.includes(userId)) {
-      return res.status(400).json({ message: 'You have already completed this course' });
-    }
-
-    course.completedBy.push(userId);
-    await course.save();
-
-    res.status(200).json({ message: 'Course marked as completed', data: course });
+    const course = courseGroup.courses.id(req.params.courseId);
+    course.lectures.push({ title, description, videoUrl, pdfUrl });
+    await courseGroup.save();
+    res.status(201).json(courseGroup);
   } catch (error) {
-    res.status(500).json({ message: 'Error marking course as completed', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Get all users who completed the course
-export const getUsersCompletedCourse = async (req, res) => {
+// Update a Lecture
+export const updateLecture = async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const course = await Course.findById(courseId).populate('completedBy', 'name email');
+    const courseGroup = await CourseGroup.findOne({ 'courses.lectures._id': req.params.lectureId });
+    if (!courseGroup) return res.status(404).json({ message: 'Lecture not found' });
 
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+    const lecture = courseGroup.courses
+      .flatMap((c) => c.lectures)
+      .find((l) => l._id.toString() === req.params.lectureId);
+
+    Object.assign(lecture, req.body);
+    await courseGroup.save();
+    res.json(courseGroup);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete a Lecture
+export const deleteLecture = async (req, res) => {
+  try {
+    const courseGroup = await CourseGroup.findOne({ 'courses.lectures._id': req.params.lectureId });
+    if (!courseGroup) return res.status(404).json({ message: 'Lecture not found' });
+
+    for (const course of courseGroup.courses) {
+      const lecture = course.lectures.id(req.params.lectureId);
+      if (lecture) lecture.remove();
     }
 
-    res.status(200).json({ message: 'Users who completed the course', data: course.completedBy });
+    await courseGroup.save();
+    res.json({ message: 'Lecture deleted' });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching completed users', error: error.message });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ------------------ Lecture Completion ------------------
+
+// Mark Lecture as completed by a User
+export const completeLecture = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const courseGroup = await CourseGroup.findOne({ 'courses.lectures._id': req.params.lectureId });
+    if (!courseGroup) return res.status(404).json({ message: 'Lecture not found' });
+
+    const lecture = courseGroup.courses
+      .flatMap((c) => c.lectures)
+      .find((l) => l._id.toString() === req.params.lectureId);
+
+    if (!lecture.completedBy.includes(userId)) {
+      lecture.completedBy.push(userId);
+      await courseGroup.save();
+    }
+
+    res.json({ message: 'Lecture marked as completed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

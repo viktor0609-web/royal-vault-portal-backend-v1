@@ -1,69 +1,41 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// Course Group Schema
-const courseGroupSchema = new Schema(
+// Lecture Schema
+const lectureSchema = new Schema(
   {
-    title: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    icon: {
-      type: String, // URL for the Icon
-      required: true,
-    },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User', // assuming User model is present
-      required: true,
-    },
+    title: { type: String, required: true },
+    description: { type: String },
+    videoUrl: { type: String, required: true },
+    pdfUrl: { type: String },
+    completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
-  { timestamps: true } // Automatically adds createdAt and updatedAt fields
+  { timestamps: true }
 );
 
-// Course Schema
+// Course Schema (nested in CourseGroup)
 const courseSchema = new Schema(
   {
-    group: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'CourseGroup',
-      required: true,
-    },
-    title: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    url: {
-      type: String,
-      required: true, // URL to access the course content
-    },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User', // assuming User model is present
-      required: true,
-    },
-    pdfUrl: {
-      type: String, // URL to PDF resource
-    },
-    completedBy: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User', // users who have completed this course
-      },
-    ],
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    url: { type: String, required: true }, // main course URL
+    lectures: [lectureSchema], // embed multiple lectures
   },
-  { timestamps: true } // Automatically adds createdAt and updatedAt fields
+  { timestamps: true }
+);
+
+// CourseGroup Schema (main)
+const courseGroupSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    icon: { type: String, required: true }, // Iconify icon string
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    courses: [courseSchema], // embed multiple courses
+  },
+  { timestamps: true }
 );
 
 const CourseGroup = mongoose.model('CourseGroup', courseGroupSchema);
-const Course = mongoose.model('Course', courseSchema);
 
-export { CourseGroup, Course };
+export { CourseGroup };

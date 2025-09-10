@@ -2,34 +2,61 @@ import express from 'express';
 import {
   createCourseGroup,
   getAllCourseGroups,
-  createCourse,
-  getCoursesByGroup,
-  getCourse,
+  getCourseGroupById,
+  addCourseToGroup,
+  addLectureToCourse,
+  completeLecture,
+  updateCourseGroup,
   updateCourse,
+  updateLecture,
+  deleteCourseGroup,
   deleteCourse,
-  markCourseAsCompleted,
-  getUsersCompletedCourse
-} from '../controllers/courseController.js'; // Import controller functions
-
-import { protect } from '../middleware/authMiddleware.js'; // Assuming you have some auth middleware
+  deleteLecture,
+} from '../controllers/courseController.js';
+import { protect, authorize } from '../middleware/authMiddleware.js'; // your JWT + role middleware
 
 const router = express.Router();
 
-// Course Group Routes
-router.post('/course-group', protect, createCourseGroup); // Create a new Course Group
-router.get('/course-groups', getAllCourseGroups); // Get all Course Groups
+// ------------------ CourseGroup APIs ------------------
 
-// Course Routes
-router.post('/', protect, createCourse); // Create a new Course
-router.get('/group/:groupId', getCoursesByGroup); // Get all courses for a group
-router.get('/:courseId', getCourse); // Get a specific course by ID
-router.put('/:courseId', protect, updateCourse); // Update a course
-router.delete('/:courseId', protect, deleteCourse); // Delete a course
+// Create a new CourseGroup (only admins)
+router.post('/', protect, authorize('admin'), createCourseGroup);
 
-// Mark Course as Completed
-router.post('/:courseId/complete', protect, markCourseAsCompleted); // Mark course as completed
+// Get all CourseGroups (any logged-in user)
+router.get('/', protect, getAllCourseGroups);
 
-// Get users who completed a specific course
-router.get('/:courseId/completed-users', getUsersCompletedCourse); // Get all users who completed the course
+// Get a single CourseGroup by ID
+router.get('/:id', protect, getCourseGroupById);
+
+// Update a CourseGroup (only admins)
+router.put('/:id', protect, authorize('admin'), updateCourseGroup);
+
+// Delete a CourseGroup (only admins)
+router.delete('/:id', protect, authorize('admin'), deleteCourseGroup);
+
+// ------------------ Course APIs ------------------
+
+// Add a Course to a CourseGroup (only admins)
+router.post('/:id/courses', protect, authorize('admin'), addCourseToGroup);
+
+// Update a Course inside a CourseGroup (only admins)
+router.put('/:courseId/courses', protect, authorize('admin'), updateCourse);
+
+// Delete a Course (only admins)
+router.delete('/:courseId/courses', protect, authorize('admin'), deleteCourse);
+
+// ------------------ Lecture APIs ------------------
+
+// Add a Lecture to a Course (only admins)
+router.post('/:courseId/lectures', protect, authorize('admin'), addLectureToCourse);
+
+// Update a Lecture inside a Course (only admins)
+router.put('/:lectureId/lectures', protect, authorize('admin'), updateLecture);
+
+// Delete a Lecture (only admins)
+router.delete('/:lectureId/lectures', protect, authorize('admin'), deleteLecture);
+
+// Mark Lecture as completed by a User (any logged-in user)
+router.post('/:lectureId/lectures/complete', protect, completeLecture);
 
 export default router;
