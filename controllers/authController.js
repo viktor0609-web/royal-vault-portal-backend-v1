@@ -80,7 +80,7 @@ export const verifyEmail = async (req, res) => {
     if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
     user.isVerified = true;
     user.verificationToken = null;
-    user.password = await bcrypt.hash('password', 10);
+    user.password = await bcrypt.hash(password, 10);
     await user.save();
     res.json({ message: 'Email verified successfully.' });
   } catch (e) {

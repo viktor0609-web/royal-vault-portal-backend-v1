@@ -10,6 +10,7 @@ import strategyRoutes from './strategyRoutes.js';
 import typeRoutes from './typeRoutes.js';   
 import categoryRoutes from './categoryRoutes.js'; // Import category routes
 import subCategoryRoutes from './subCategoryRoutes.js'; // Import sub-category routes
+import uploadRoutes from './uploadRoutes.js'; // Import upload routes
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use('/strategies', strategyRoutes); // Strategy-related routes
 router.use('/types', typeRoutes); // Type-related routes
 router.use('/categories', categoryRoutes); // Category-related routes
 router.use('/sub-categories', subCategoryRoutes); // Sub-category-related routes    
+router.use('/upload', uploadRoutes); // Upload-related routes
 
 export default router;

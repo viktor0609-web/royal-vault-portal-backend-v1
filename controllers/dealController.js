@@ -135,13 +135,12 @@ export const deleteDeal = async (req, res) => {
   const { dealId } = req.params;
 
   try {
-    const deal = await Deal.findById(dealId);
+    const deal = await Deal.findByIdAndDelete(dealId);
 
     if (!deal) {
       return res.status(404).json({ message: 'Deal not found' });
     }
 
-    await deal.remove();
     return res.status(200).json({ message: 'Deal deleted successfully' });
   } catch (error) {
     console.error(error);

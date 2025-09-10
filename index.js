@@ -12,8 +12,12 @@ const app = express();
 
 app.use(morgan('dev')); // Use 'dev' format for concise logs
 
-// Allowed origins: local dev + production frontend
-const allowedOrigins = [process.env.CLIENT_URL || 'http://localhost:8080'];
+// Allowed origins: local dev (Vite 5173) + legacy 8080 + production
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'http://localhost:8080',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
 
 // CORS middleware
 app.use(
@@ -52,6 +56,9 @@ app.options(
 
 // Body parser
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
 
 // Test route
 app.get('/', (req, res) => {
