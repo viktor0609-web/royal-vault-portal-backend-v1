@@ -12,6 +12,8 @@ export const createDeal = async (req, res) => {
       requirementIds,
       sourceId,
       createdBy,
+      url,
+      image
     } = req.body;
 
     // Validate required fields
@@ -23,7 +25,9 @@ export const createDeal = async (req, res) => {
       !strategyIds?.length ||
       !requirementIds?.length ||
       !sourceId ||
-      !createdBy
+      !createdBy ||
+      !url ||
+      !image
     ) {
       return res.status(400).json({ message: 'All fields are required' });
     }
@@ -37,6 +41,8 @@ export const createDeal = async (req, res) => {
       requirement: requirementIds,
       source: sourceId,
       createdBy,
+      url,
+      image
     });
 
     await deal.save();
@@ -102,7 +108,8 @@ export const updateDeal = async (req, res) => {
     strategyIds,
     requirementIds,
     sourceId,
-    createdBy,
+    url,
+    image
   } = req.body;
 
   try {
@@ -120,8 +127,8 @@ export const updateDeal = async (req, res) => {
     deal.strategy = strategyIds || deal.strategy;
     deal.requirement = requirementIds || deal.requirement;
     deal.source = sourceId || deal.source;
-    deal.createdBy = createdBy || deal.createdBy;
-
+    deal.url = url || deal.url;
+    deal.image = image || deal.image;
     await deal.save();
     return res.status(200).json({ message: 'Deal updated successfully', deal });
   } catch (error) {

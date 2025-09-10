@@ -12,35 +12,35 @@ const dealSchema = new Schema(
     category: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category', // Reference to Category model
+        ref: 'Category',
         required: true,
       },
     ],
     subCategory: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'SubCategory', // Reference to SubCategory model
+        ref: 'SubCategory',
         required: true,
       },
     ],
     type: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Type', // Reference to Type model
+        ref: 'Type',
         required: true,
       },
     ],
     strategy: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Strategy', // Reference to Strategy model
+        ref: 'Strategy',
         required: true,
       },
     ],
     requirement: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Requirement', // Reference to Requirement model
+        ref: 'Requirement',
         required: true,
       },
     ],
@@ -48,14 +48,18 @@ const dealSchema = new Schema(
       type: String,
       trim: true,
     },
+    url: {
+      type: String,
+      trim: true,
+    },
     source: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Source', // Reference to Source model
+      ref: 'Source',
       required: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User', // Assuming you have a User model
+      ref: 'User',
       required: true,
     },
   },
