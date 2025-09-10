@@ -60,6 +60,7 @@ export const registerUser = async (req, res) => {
 
     // Send the verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
+
     const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
     await sendEmail(email, username, verificationUrl, templateId);
 
