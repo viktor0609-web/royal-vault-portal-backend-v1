@@ -1,62 +1,83 @@
 import express from 'express';
 import {
+  // CourseGroup routes
   createCourseGroup,
   getAllCourseGroups,
   getCourseGroupById,
-  addCourseToGroup,
-  addLectureToCourse,
-  completeLecture,
   updateCourseGroup,
-  updateCourse,
-  updateLecture,
   deleteCourseGroup,
+  
+  // Course routes
+  createCourse,
+  getAllCourses,
+  getCourseById,
+  updateCourse,
   deleteCourse,
+  
+  // Lecture routes
+  createLecture,
+  getAllLectures,
+  getLectureById,
+  updateLecture,
   deleteLecture,
+  completeLecture,
 } from '../controllers/courseController.js';
-import { protect, authorize } from '../middleware/authMiddleware.js'; // your JWT + role middleware
+import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// ------------------ CourseGroup APIs ------------------
+// ------------------ CourseGroup Routes ------------------
 
 // Create a new CourseGroup (only admins)
-router.post('/', protect, authorize('admin'), createCourseGroup);
+router.post('/groups', protect, authorize('admin'), createCourseGroup);
 
 // Get all CourseGroups (any logged-in user)
-router.get('/', protect, getAllCourseGroups);
+router.get('/groups', protect, getAllCourseGroups);
 
 // Get a single CourseGroup by ID
-router.get('/:id', protect, getCourseGroupById);
+router.get('/groups/:id', protect, getCourseGroupById);
 
 // Update a CourseGroup (only admins)
-router.put('/:id', protect, authorize('admin'), updateCourseGroup);
+router.put('/groups/:id', protect, authorize('admin'), updateCourseGroup);
 
 // Delete a CourseGroup (only admins)
-router.delete('/:id', protect, authorize('admin'), deleteCourseGroup);
+router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup);
 
-// ------------------ Course APIs ------------------
+// ------------------ Course Routes ------------------
 
-// Add a Course to a CourseGroup (only admins)
-router.post('/:id/courses', protect, authorize('admin'), addCourseToGroup);
+// Create a new Course (only admins)
+router.post('/courses', protect, authorize('admin'), createCourse);
 
-// Update a Course inside a CourseGroup (only admins)
-router.put('/:courseId/courses', protect, authorize('admin'), updateCourse);
+// Get all Courses (any logged-in user)
+router.get('/courses', protect, getAllCourses);
+
+// Get a single Course by ID
+router.get('/courses/:id', protect, getCourseById);
+
+// Update a Course (only admins)
+router.put('/courses/:id', protect, authorize('admin'), updateCourse);
 
 // Delete a Course (only admins)
-router.delete('/:courseId/courses', protect, authorize('admin'), deleteCourse);
+router.delete('/courses/:id', protect, authorize('admin'), deleteCourse);
 
-// ------------------ Lecture APIs ------------------
+// ------------------ Lecture Routes ------------------
 
-// Add a Lecture to a Course (only admins)
-router.post('/:courseId/lectures', protect, authorize('admin'), addLectureToCourse);
+// Create a new Lecture (only admins)
+router.post('/lectures', protect, authorize('admin'), createLecture);
 
-// Update a Lecture inside a Course (only admins)
-router.put('/:lectureId/lectures', protect, authorize('admin'), updateLecture);
+// Get all Lectures (any logged-in user)
+router.get('/lectures', protect, getAllLectures);
+
+// Get a single Lecture by ID
+router.get('/lectures/:id', protect, getLectureById);
+
+// Update a Lecture (only admins)
+router.put('/lectures/:id', protect, authorize('admin'), updateLecture);
 
 // Delete a Lecture (only admins)
-router.delete('/:lectureId/lectures', protect, authorize('admin'), deleteLecture);
+router.delete('/lectures/:id', protect, authorize('admin'), deleteLecture);
 
 // Mark Lecture as completed by a User (any logged-in user)
-router.post('/:lectureId/lectures/complete', protect, completeLecture);
+router.post('/lectures/:id/complete', protect, completeLecture);
 
 export default router;
