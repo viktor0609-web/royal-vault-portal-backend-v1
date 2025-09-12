@@ -14,7 +14,8 @@ app.use(morgan('dev')); // Use 'dev' format for concise logs
 
 // Allowed origins: local dev (Vite 5173) + legacy 8080 + production
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:8080',
+  process.env.CLIENT_URL,
+  'http://localhost:8080',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ];
