@@ -5,7 +5,7 @@ import {
   getSubCategoryById,
   updateSubCategory,
   deleteSubCategory,
-} from '../controllers/subCategoryController.js';
+} from '../controllers/subcategoryController.js';
 
 const router = express.Router();
 
