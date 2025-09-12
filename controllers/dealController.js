@@ -42,7 +42,8 @@ export const createDeal = async (req, res) => {
       source: sourceId,
       createdBy,
       url,
-      image
+      image,
+      createdBy: req.user.id,
     });
 
     await deal.save();
@@ -56,15 +57,18 @@ export const createDeal = async (req, res) => {
 // Get all deals
 export const getAllDeals = async (req, res) => {
   try {
+    
     const deals = await Deal.find()
-      .populate('category')
-      .populate('subCategory')
-      .populate('type')
-      .populate('strategy')
-      .populate('requirement')
-      .populate('source')
-      .populate('createdBy');
-
+    .populate([
+      { path: 'category' },
+      { path: 'subCategory' },
+      { path: 'type' },
+      { path: 'strategy' },
+      { path: 'requirement' },
+      { path: 'source' },
+      { path: 'createdBy' }
+    ])
+    .lean(); // keeps same populated result but much faster
     return res.status(200).json({ message: 'Deals fetched successfully', deals });
   } catch (error) {
     console.error(error);
@@ -170,6 +174,7 @@ export const filterDeals = async (req, res) => {
     } = req.query;
 
     const filter = {};
+    console.log("req.query", req.query);
 
     if (name) {
       filter.name = { $regex: name, $options: 'i' }; // case-insensitive search
@@ -181,6 +186,7 @@ export const filterDeals = async (req, res) => {
     if (requirementId) filter.requirement = requirementId;
     if (sourceId) filter.source = sourceId;
     if (createdBy) filter.createdBy = createdBy;
+
 
     const deals = await Deal.find(filter)
       .populate('category')
