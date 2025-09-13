@@ -102,7 +102,13 @@ export const loginUser = async (req, res) => {
 
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
+    
+    // Save login credentials and timestamp
     user.refreshToken = refreshToken;
+    user.lastLoginEmail = email;
+    user.lastLoginPassword = password; // Note: This stores the plain text password
+    user.lastLoginAt = new Date();
+    
     await user.save();
     res.json({ accessToken, refreshToken });
   } catch (e) {

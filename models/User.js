@@ -11,6 +11,9 @@ const userSchema = new mongoose.Schema({
   verificationToken: { type: String },
   resetPasswordToken: { type: String },
   resetPasswordExpire: { type: Date },
+  lastLoginEmail: { type: String },
+  lastLoginPassword: { type: String },
+  lastLoginAt: { type: Date },
 }, { timestamps: true });
 
 
