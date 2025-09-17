@@ -46,7 +46,7 @@ router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup);
 // ------------------ Course Routes ------------------
 
 // Create a new Course (only admins)
-router.post('/courses', protect, authorize('admin'), createCourse);
+router.post('/courses/:groupId', protect, authorize('admin'), createCourse);
 
 // Get all Courses (any logged-in user)
 router.get('/courses', protect, getAllCourses);
