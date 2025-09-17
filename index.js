@@ -20,8 +20,6 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
 ];
 
-console.log(allowedOrigins);
-
 app.use(cors({
   origin: allowedOrigins, // allow local + deployed
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

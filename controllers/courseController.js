@@ -10,8 +10,10 @@ export const createCourseGroup = async (req, res) => {
     const createdBy = req.user._id;
     const courseGroup = await CourseGroup.create({ title, description, icon, createdBy });
     await courseGroup.populate('createdBy', 'name email');
+    
     res.status(201).json(courseGroup);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -68,8 +70,8 @@ export const getAllCourseGroups = async (req, res) => {
             includeGroup = true;
           }
           
-          // Get lectures for this course
-          const lectures = await Lecture.find({ course: course._id }).lean();
+          // Get lectures for this course using the lectures array
+          const lectures = course.lectures ? await Lecture.find({ _id: { $in: course.lectures } }).lean() : [];
           const lecturesWithSearch = lectures.filter(lecture =>
             searchRegex.test(lecture.title) || searchRegex.test(lecture.description)
           );
@@ -100,7 +102,7 @@ export const getAllCourseGroups = async (req, res) => {
         const coursesWithLectures = [];
         
         for (const course of courses) {
-          const lectures = await Lecture.find({ course: course._id }).lean();
+          const lectures = course.lectures ? await Lecture.find({ _id: { $in: course.lectures } }).lean() : [];
           coursesWithLectures.push({
             ...course,
             lectures
@@ -113,6 +115,7 @@ export const getAllCourseGroups = async (req, res) => {
 
     res.json(courseGroups);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -130,7 +133,7 @@ export const getCourseGroupById = async (req, res) => {
     const coursesWithLectures = [];
     
     for (const course of courses) {
-      const lectures = await Lecture.find({ course: course._id });
+      const lectures = course.lectures ? await Lecture.find({ _id: { $in: course.lectures } }) : [];
       coursesWithLectures.push({
         ...course.toObject(),
         lectures
@@ -169,8 +172,10 @@ export const deleteCourseGroup = async (req, res) => {
     // Delete all courses in this group
     const courses = await Course.find({ courseGroup: courseGroup._id });
     for (const course of courses) {
-      // Delete all lectures in this course
-      await Lecture.deleteMany({ course: course._id });
+      // Delete all lectures referenced by this course
+      if (course.lectures && course.lectures.length > 0) {
+        await Lecture.deleteMany({ _id: { $in: course.lectures } });
+      }
     }
     await Course.deleteMany({ courseGroup: courseGroup._id });
     
@@ -187,20 +192,21 @@ export const deleteCourseGroup = async (req, res) => {
 // Create a new Course
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, url, courseGroupId } = req.body;
+    const { title, description, lectures = [] } = req.body;
+    const courseGroup = req.params.groupId;
     const createdBy = req.user._id;
     
     const course = await Course.create({ 
       title, 
       description, 
-      url, 
-      courseGroup: courseGroupId,
+      courseGroup,
+      lectures,
       createdBy 
     });
     
-    await course.populate('createdBy', 'name email');
     res.status(201).json(course);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -210,7 +216,8 @@ export const getAllCourses = async (req, res) => {
   try {
     const courses = await Course.find()
       .populate('createdBy', 'name email')
-      .populate('courseGroup', 'title')
+      .populate('courseGroup', 'title description icon')
+      .populate('lectures', 'title description videoUrl pdfUrl')
       .lean();
     res.json(courses);
   } catch (error) {
@@ -223,18 +230,12 @@ export const getCourseById = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id)
       .populate('createdBy', 'name email')
-      .populate('courseGroup', 'title');
+      .populate('courseGroup', 'title description icon')
+      .populate('lectures', 'title description videoUrl pdfUrl completedBy');
     
     if (!course) return res.status(404).json({ message: 'Course not found' });
     
-    // Get lectures for this course
-    const lectures = await Lecture.find({ course: course._id });
-    const result = {
-      ...course.toObject(),
-      lectures
-    };
-    
-    res.json(result);
+    res.json(course);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -245,7 +246,8 @@ export const updateCourse = async (req, res) => {
   try {
     const updated = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('createdBy', 'name email')
-      .populate('courseGroup', 'title');
+      .populate('courseGroup', 'title description icon')
+      .populate('lectures', 'title description videoUrl pdfUrl completedBy');
     if (!updated) return res.status(404).json({ message: 'Course not found' });
     res.json(updated);
   } catch (error) {
@@ -256,12 +258,16 @@ export const updateCourse = async (req, res) => {
 // Delete Course
 export const deleteCourse = async (req, res) => {
   try {
-    // Delete all lectures in this course
-    await Lecture.deleteMany({ course: req.params.id });
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+    
+    // Delete all lectures referenced by this course
+    if (course.lectures && course.lectures.length > 0) {
+      await Lecture.deleteMany({ _id: { $in: course.lectures } });
+    }
     
     // Delete the course
-    const deleted = await Course.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: 'Course not found' });
+    await Course.findByIdAndDelete(req.params.id);
     res.json({ message: 'Course and all associated lectures deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -274,14 +280,24 @@ export const deleteCourse = async (req, res) => {
 export const createLecture = async (req, res) => {
   try {
     const { title, description, videoUrl, pdfUrl, courseId } = req.body;
-    
+    const createdBy = req.user._id;
     const lecture = await Lecture.create({ 
       title, 
       description, 
       videoUrl, 
       pdfUrl,
-      course: courseId
+      createdBy
     });
+    
+    // Add lecture to course's lectures array
+    if (courseId) {
+      await Course.findByIdAndUpdate(courseId, {
+        $push: { lectures: lecture._id }
+      });
+    }
+    
+    // Populate the created lecture
+    await lecture.populate('createdBy', 'name email');
     
     res.status(201).json(lecture);
   } catch (error) {
@@ -293,7 +309,8 @@ export const createLecture = async (req, res) => {
 export const getAllLectures = async (req, res) => {
   try {
     const lectures = await Lecture.find()
-      .populate('course', 'title')
+      .populate('createdBy', 'name email')
+      .populate('completedBy', 'name email')
       .lean();
     res.json(lectures);
   } catch (error) {
@@ -305,7 +322,8 @@ export const getAllLectures = async (req, res) => {
 export const getLectureById = async (req, res) => {
   try {
     const lecture = await Lecture.findById(req.params.id)
-      .populate('course', 'title');
+      .populate('createdBy', 'name email')
+      .populate('completedBy', 'name email');
     
     if (!lecture) return res.status(404).json({ message: 'Lecture not found' });
     res.json(lecture);
@@ -318,7 +336,8 @@ export const getLectureById = async (req, res) => {
 export const updateLecture = async (req, res) => {
   try {
     const updated = await Lecture.findByIdAndUpdate(req.params.id, req.body, { new: true })
-      .populate('course', 'title');
+      .populate('createdBy', 'name email')
+      .populate('completedBy', 'name email');
     if (!updated) return res.status(404).json({ message: 'Lecture not found' });
     res.json(updated);
   } catch (error) {
@@ -329,7 +348,16 @@ export const updateLecture = async (req, res) => {
 // Delete Lecture
 export const deleteLecture = async (req, res) => {
   try {
-    const deleted = await Lecture.findByIdAndDelete(req.params.id);
+    const lectureId = req.params.id;
+    
+    // Remove lecture from all courses that reference it
+    await Course.updateMany(
+      { lectures: lectureId },
+      { $pull: { lectures: lectureId } }
+    );
+    
+    // Delete the lecture
+    const deleted = await Lecture.findByIdAndDelete(lectureId);
     if (!deleted) return res.status(404).json({ message: 'Lecture not found' });
     res.json({ message: 'Lecture deleted' });
   } catch (error) {

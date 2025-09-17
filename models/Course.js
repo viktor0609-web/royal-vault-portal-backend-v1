@@ -1,44 +1,45 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// Lecture Schema
+// CourseGroup Schema (now bottom level)
+const courseGroupSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    icon: { type: String, required: true },
+    courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { timestamps: true }
+);
+
+// Course Schema (now middle level)
+const courseSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    courseGroup: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseGroup', required: true },
+    lectures: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lecture' }],
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { timestamps: true }
+);
+
+// Lecture Schema (now top level)
 const lectureSchema = new Schema(
   {
     title: { type: String, required: true },
     description: { type: String },
     videoUrl: { type: String, required: true },
     pdfUrl: { type: String },
-    course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
     completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  },
-  { timestamps: true }
-);
-
-// Course Schema
-const courseSchema = new Schema(
-  {
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    url: { type: String, required: true },
-    courseGroup: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseGroup', required: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }
 );
 
-// CourseGroup Schema
-const courseGroupSchema = new Schema(
-  {
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    icon: { type: String, required: true },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  },
-  { timestamps: true }
-);
-
-const CourseGroup = mongoose.model('CourseGroup', courseGroupSchema);
-const Course = mongoose.model('Course', courseSchema);
 const Lecture = mongoose.model('Lecture', lectureSchema);
+const Course = mongoose.model('Course', courseSchema);
+const CourseGroup = mongoose.model('CourseGroup', courseGroupSchema);
 
-export { CourseGroup, Course, Lecture };
+export { Lecture, Course, CourseGroup };
