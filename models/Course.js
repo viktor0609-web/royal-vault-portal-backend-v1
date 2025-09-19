@@ -33,10 +33,9 @@ const lectureSchema = new Schema(
     content: { type: String }, // Rich text content
     videoUrl: { type: String },
     videoFile: { type: String }, // Uploaded video file URL
-    pdfUrl: { type: String },
     relatedFiles: [{
-      name: { type: String, required: true },
-      url: { type: String, required: true },
+      name: { type: String },
+      url: { type: String },
       uploadedUrl: { type: String } // Track if it was uploaded vs URL
     }],
     completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
@@ -44,6 +43,23 @@ const lectureSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Add pre-save middleware to validate related files
+lectureSchema.pre('save', function(next) {
+  if (this.relatedFiles && this.relatedFiles.length > 0) {
+    for (let i = 0; i < this.relatedFiles.length; i++) {
+      const file = this.relatedFiles[i];
+      const hasUrl = file.url && file.url.trim() !== '';
+      const hasUploadedUrl = file.uploadedUrl && file.uploadedUrl.trim() !== '';
+      
+      if (!hasUrl && !hasUploadedUrl) {
+        const error = new Error(`Related file ${i + 1} must have either a URL or uploaded file`);
+        return next(error);
+      }
+    }
+  }
+  next();
+});
 
 const Lecture = mongoose.model('Lecture', lectureSchema);
 const Course = mongoose.model('Course', courseSchema);

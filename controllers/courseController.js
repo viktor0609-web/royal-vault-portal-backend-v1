@@ -260,7 +260,7 @@ export const getAllCourses = async (req, res) => {
     const courses = await Course.find()
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description content videoUrl videoFile pdfUrl relatedFiles')
+      .populate('lectures', 'title description content videoUrl videoFile relatedFiles createdBy createdAt')
       .lean();
     res.json(courses);
   } catch (error) {
@@ -274,7 +274,7 @@ export const getCourseById = async (req, res) => {
     const course = await Course.findById(req.params.id)
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description content videoUrl videoFile pdfUrl relatedFiles completedBy');
+      .populate('lectures', 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy');
     
     if (!course) return res.status(404).json({ message: 'Course not found' });
     
@@ -290,7 +290,7 @@ export const updateCourse = async (req, res) => {
     const updated = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description content videoUrl videoFile pdfUrl relatedFiles completedBy');
+      .populate('lectures', 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy');
     if (!updated) return res.status(404).json({ message: 'Course not found' });
     res.json(updated);
   } catch (error) {
@@ -328,17 +328,33 @@ export const createLecture = async (req, res) => {
       content,
       videoUrl, 
       videoFile,
-      pdfUrl, 
       relatedFiles = [],
       courseId 
     } = req.body;
     
+    console.log('Backend received relatedFiles:', relatedFiles);
+    
+    
     // Clean relatedFiles to remove any _id fields that might be sent from frontend
-    const cleanedRelatedFiles = relatedFiles.map(file => ({
-      name: file.name,
-      url: file.url,
+    const cleanedRelatedFiles = relatedFiles && relatedFiles.length > 0 ? relatedFiles.map(file => ({
+      name: file.name || "",
+      url: file.url || "",
       uploadedUrl: file.uploadedUrl || ""
-    }));
+    })) : [];
+    
+    // Validate related files - each must have either URL or uploadedUrl (not both required)
+    for (let i = 0; i < cleanedRelatedFiles.length; i++) {
+      const file = cleanedRelatedFiles[i];
+      const hasUrl = file.url && file.url.trim() !== '';
+      const hasUploadedUrl = file.uploadedUrl && file.uploadedUrl.trim() !== '';
+      
+      if (!hasUrl && !hasUploadedUrl) {
+        return res.status(400).json({ 
+          message: `Related file ${i + 1} must have either a URL or uploaded file` 
+        });
+      }
+    }
+    
     const createdBy = req.user._id;
     
     // Validation
@@ -346,10 +362,9 @@ export const createLecture = async (req, res) => {
       return res.status(400).json({ message: 'Title is required' });
     }
     
-    // Video URL or Video File is required (at least one) - but allow empty strings to be passed
-    if ((!videoUrl || videoUrl.trim() === '') && (!videoFile || videoFile.trim() === '')) {
-      return res.status(400).json({ message: 'Either video URL or video file is required' });
-    }
+    // Video is completely optional - no validation required
+    
+    console.log('Creating lecture with relatedFiles:', cleanedRelatedFiles);
     
     const lecture = await Lecture.create({ 
       title, 
@@ -357,10 +372,11 @@ export const createLecture = async (req, res) => {
       content,
       videoUrl, 
       videoFile,
-      pdfUrl,
       relatedFiles: cleanedRelatedFiles,
       createdBy
     });
+    
+    console.log('Created lecture:', lecture);
     
     // Add lecture to course's lectures array
     if (courseId) {
@@ -418,26 +434,40 @@ export const updateLecture = async (req, res) => {
       content,
       videoUrl, 
       videoFile,
-      pdfUrl, 
       relatedFiles 
     } = req.body;
     
     // Clean relatedFiles to remove any _id fields that might be sent from frontend
-    const cleanedRelatedFiles = relatedFiles ? relatedFiles.map(file => ({
-      name: file.name,
-      url: file.url,
+    console.log('Backend received relatedFiles for update:', relatedFiles);
+    const cleanedRelatedFiles = relatedFiles && relatedFiles.length > 0 ? relatedFiles.map(file => ({
+      name: file.name || "",
+      url: file.url || "",
       uploadedUrl: file.uploadedUrl || ""
-    })) : undefined;
+    })) : (relatedFiles !== undefined ? [] : undefined);
+    
+    console.log('Cleaned relatedFiles for update:', cleanedRelatedFiles);
+    
+    // Validate related files - each must have either URL or uploadedUrl (not both required)
+    if (cleanedRelatedFiles && cleanedRelatedFiles.length > 0) {
+      for (let i = 0; i < cleanedRelatedFiles.length; i++) {
+        const file = cleanedRelatedFiles[i];
+        const hasUrl = file.url && file.url.trim() !== '';
+        const hasUploadedUrl = file.uploadedUrl && file.uploadedUrl.trim() !== '';
+        
+        if (!hasUrl && !hasUploadedUrl) {
+          return res.status(400).json({ 
+            message: `Related file ${i + 1} must have either a URL or uploaded file` 
+          });
+        }
+      }
+    }
     
     // Validation
     if (title !== undefined && !title.trim()) {
       return res.status(400).json({ message: 'Title cannot be empty' });
     }
     
-    // Video URL or Video File is required (at least one) for updates only if both are being explicitly cleared
-    if (videoUrl === "" && videoFile === "" && (videoUrl !== undefined || videoFile !== undefined)) {
-      return res.status(400).json({ message: 'Either video URL or video file is required' });
-    }
+    // Video is completely optional for updates - no validation required
     
     const updateData = {};
     if (title !== undefined) updateData.title = title;
@@ -445,8 +475,11 @@ export const updateLecture = async (req, res) => {
     if (content !== undefined) updateData.content = content;
     if (videoUrl !== undefined) updateData.videoUrl = videoUrl;
     if (videoFile !== undefined) updateData.videoFile = videoFile;
-    if (pdfUrl !== undefined) updateData.pdfUrl = pdfUrl;
-    if (cleanedRelatedFiles !== undefined) updateData.relatedFiles = cleanedRelatedFiles;
+    // Always update relatedFiles if it's provided (even if empty array)
+    if (relatedFiles !== undefined) {
+      console.log('Updating relatedFiles with:', cleanedRelatedFiles);
+      updateData.relatedFiles = cleanedRelatedFiles || [];
+    }
     
     const updated = await Lecture.findByIdAndUpdate(req.params.id, updateData, { new: true })
       .populate('createdBy', 'name email')
