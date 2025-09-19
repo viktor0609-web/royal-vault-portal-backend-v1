@@ -7,6 +7,12 @@ import User from '../models/User.js';
 export const createCourseGroup = async (req, res) => {
   try {
     const { title, description, icon } = req.body;
+    
+    // Validation
+    if (!title || !description || !icon) {
+      return res.status(400).json({ message: 'Title, description, and icon are required' });
+    }
+    
     const createdBy = req.user._id;
     const courseGroup = await CourseGroup.create({ title, description, icon, createdBy });
     await courseGroup.populate('createdBy', 'name email');
@@ -14,7 +20,10 @@ export const createCourseGroup = async (req, res) => {
     res.status(201).json(courseGroup);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to create course group' });
   }
 };
 
@@ -154,12 +163,29 @@ export const getCourseGroupById = async (req, res) => {
 // Update CourseGroup
 export const updateCourseGroup = async (req, res) => {
   try {
+    const { title, description, icon } = req.body;
+    
+    // Validation
+    if (title !== undefined && !title.trim()) {
+      return res.status(400).json({ message: 'Title cannot be empty' });
+    }
+    if (description !== undefined && !description.trim()) {
+      return res.status(400).json({ message: 'Description cannot be empty' });
+    }
+    if (icon !== undefined && !icon.trim()) {
+      return res.status(400).json({ message: 'Icon cannot be empty' });
+    }
+    
     const updated = await CourseGroup.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('createdBy', 'name email');
     if (!updated) return res.status(404).json({ message: 'CourseGroup not found' });
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log(error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to update course group' });
   }
 };
 
@@ -196,6 +222,17 @@ export const createCourse = async (req, res) => {
     const courseGroup = req.params.groupId;
     const createdBy = req.user._id;
     
+    // Validation
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Title and description are required' });
+    }
+    
+    // Check if course group exists
+    const group = await CourseGroup.findById(courseGroup);
+    if (!group) {
+      return res.status(404).json({ message: 'Course group not found' });
+    }
+    
     const course = await Course.create({ 
       title, 
       description, 
@@ -204,10 +241,16 @@ export const createCourse = async (req, res) => {
       createdBy 
     });
     
+    await course.populate('createdBy', 'name email');
+    await course.populate('courseGroup', 'title description icon');
+    
     res.status(201).json(course);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to create course' });
   }
 };
 
@@ -217,7 +260,7 @@ export const getAllCourses = async (req, res) => {
     const courses = await Course.find()
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description videoUrl pdfUrl')
+      .populate('lectures', 'title description content videoUrl videoFile pdfUrl relatedFiles')
       .lean();
     res.json(courses);
   } catch (error) {
@@ -231,7 +274,7 @@ export const getCourseById = async (req, res) => {
     const course = await Course.findById(req.params.id)
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description videoUrl pdfUrl completedBy');
+      .populate('lectures', 'title description content videoUrl videoFile pdfUrl relatedFiles completedBy');
     
     if (!course) return res.status(404).json({ message: 'Course not found' });
     
@@ -247,7 +290,7 @@ export const updateCourse = async (req, res) => {
     const updated = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description videoUrl pdfUrl completedBy');
+      .populate('lectures', 'title description content videoUrl videoFile pdfUrl relatedFiles completedBy');
     if (!updated) return res.status(404).json({ message: 'Course not found' });
     res.json(updated);
   } catch (error) {
@@ -279,13 +322,43 @@ export const deleteCourse = async (req, res) => {
 // Create a new Lecture
 export const createLecture = async (req, res) => {
   try {
-    const { title, description, videoUrl, pdfUrl, courseId } = req.body;
+    const { 
+      title, 
+      description, 
+      content,
+      videoUrl, 
+      videoFile,
+      pdfUrl, 
+      relatedFiles = [],
+      courseId 
+    } = req.body;
+    
+    // Clean relatedFiles to remove any _id fields that might be sent from frontend
+    const cleanedRelatedFiles = relatedFiles.map(file => ({
+      name: file.name,
+      url: file.url,
+      uploadedUrl: file.uploadedUrl || ""
+    }));
     const createdBy = req.user._id;
+    
+    // Validation
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
+    
+    // Video URL or Video File is required (at least one) - but allow empty strings to be passed
+    if ((!videoUrl || videoUrl.trim() === '') && (!videoFile || videoFile.trim() === '')) {
+      return res.status(400).json({ message: 'Either video URL or video file is required' });
+    }
+    
     const lecture = await Lecture.create({ 
       title, 
       description, 
+      content,
       videoUrl, 
+      videoFile,
       pdfUrl,
+      relatedFiles: cleanedRelatedFiles,
       createdBy
     });
     
@@ -301,7 +374,11 @@ export const createLecture = async (req, res) => {
     
     res.status(201).json(lecture);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log(error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to create lecture' });
   }
 };
 
@@ -335,13 +412,53 @@ export const getLectureById = async (req, res) => {
 // Update Lecture
 export const updateLecture = async (req, res) => {
   try {
-    const updated = await Lecture.findByIdAndUpdate(req.params.id, req.body, { new: true })
+    const { 
+      title, 
+      description, 
+      content,
+      videoUrl, 
+      videoFile,
+      pdfUrl, 
+      relatedFiles 
+    } = req.body;
+    
+    // Clean relatedFiles to remove any _id fields that might be sent from frontend
+    const cleanedRelatedFiles = relatedFiles ? relatedFiles.map(file => ({
+      name: file.name,
+      url: file.url,
+      uploadedUrl: file.uploadedUrl || ""
+    })) : undefined;
+    
+    // Validation
+    if (title !== undefined && !title.trim()) {
+      return res.status(400).json({ message: 'Title cannot be empty' });
+    }
+    
+    // Video URL or Video File is required (at least one) for updates only if both are being explicitly cleared
+    if (videoUrl === "" && videoFile === "" && (videoUrl !== undefined || videoFile !== undefined)) {
+      return res.status(400).json({ message: 'Either video URL or video file is required' });
+    }
+    
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (content !== undefined) updateData.content = content;
+    if (videoUrl !== undefined) updateData.videoUrl = videoUrl;
+    if (videoFile !== undefined) updateData.videoFile = videoFile;
+    if (pdfUrl !== undefined) updateData.pdfUrl = pdfUrl;
+    if (cleanedRelatedFiles !== undefined) updateData.relatedFiles = cleanedRelatedFiles;
+    
+    const updated = await Lecture.findByIdAndUpdate(req.params.id, updateData, { new: true })
       .populate('createdBy', 'name email')
       .populate('completedBy', 'name email');
     if (!updated) return res.status(404).json({ message: 'Lecture not found' });
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log(error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to update lecture' });
   }
 };
 

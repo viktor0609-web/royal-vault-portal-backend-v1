@@ -30,8 +30,15 @@ const lectureSchema = new Schema(
   {
     title: { type: String, required: true },
     description: { type: String },
-    videoUrl: { type: String, required: true },
+    content: { type: String }, // Rich text content
+    videoUrl: { type: String },
+    videoFile: { type: String }, // Uploaded video file URL
     pdfUrl: { type: String },
+    relatedFiles: [{
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      uploadedUrl: { type: String } // Track if it was uploaded vs URL
+    }],
     completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },
