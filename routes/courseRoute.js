@@ -31,11 +31,11 @@ const router = express.Router();
 // Create a new CourseGroup (only admins)
 router.post('/groups', protect, authorize('admin'), createCourseGroup);
 
-// Get all CourseGroups (any logged-in user)
-router.get('/groups', protect, getAllCourseGroups);
+// Get all CourseGroups (public access)
+router.get('/groups', getAllCourseGroups);
 
-// Get a single CourseGroup by ID
-router.get('/groups/:id', protect, getCourseGroupById);
+// Get a single CourseGroup by ID (public access)
+router.get('/groups/:id', getCourseGroupById);
 
 // Update a CourseGroup (only admins)
 router.put('/groups/:id', protect, authorize('admin'), updateCourseGroup);
@@ -48,11 +48,11 @@ router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup);
 // Create a new Course (only admins)
 router.post('/courses/:groupId', protect, authorize('admin'), createCourse);
 
-// Get all Courses (any logged-in user)
-router.get('/courses', protect, getAllCourses);
+// Get all Courses (public access)
+router.get('/courses', getAllCourses);
 
-// Get a single Course by ID
-router.get('/courses/:id', protect, getCourseById);
+// Get a single Course by ID (public access)
+router.get('/courses/:id', getCourseById);
 
 // Update a Course (only admins)
 router.put('/courses/:id', protect, authorize('admin'), updateCourse);
