@@ -14,6 +14,7 @@ const sendEmail = async (to, firstName, url, templateId) => {
       }
     };
 
+    
     console.log("Sending email via SendGrid:", msg);
     
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
