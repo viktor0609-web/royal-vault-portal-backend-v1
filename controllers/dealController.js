@@ -54,21 +54,50 @@ export const createDeal = async (req, res) => {
   }
 };
 
-// Get all deals
+// Get all deals - OPTIMIZED VERSION
 export const getAllDeals = async (req, res) => {
   try {
+    const { fields = 'basic' } = req.query;
+    
+    let populateFields = [];
+    if (fields === 'basic') {
+      // For basic list view - only essential fields
+      populateFields = [
+        { path: 'category', select: 'name' },
+        { path: 'subCategory', select: 'name' },
+        { path: 'type', select: 'name' },
+        { path: 'strategy', select: 'name' },
+        { path: 'requirement', select: 'name' },
+        { path: 'source', select: 'name' },
+        { path: 'createdBy', select: 'name' }
+      ];
+    } else if (fields === 'detailed') {
+      // For detailed view - all fields but no deep population
+      populateFields = [
+        { path: 'category' },
+        { path: 'subCategory' },
+        { path: 'type' },
+        { path: 'strategy' },
+        { path: 'requirement' },
+        { path: 'source' },
+        { path: 'createdBy' }
+      ];
+    } else if (fields === 'full') {
+      // For admin view - all fields with full population
+      populateFields = [
+        { path: 'category' },
+        { path: 'subCategory' },
+        { path: 'type' },
+        { path: 'strategy' },
+        { path: 'requirement' },
+        { path: 'source' },
+        { path: 'createdBy' }
+      ];
+    }
     
     const deals = await Deal.find()
-    .populate([
-      { path: 'category' },
-      { path: 'subCategory' },
-      { path: 'type' },
-      { path: 'strategy' },
-      { path: 'requirement' },
-      { path: 'source' },
-      { path: 'createdBy' }
-    ])
-    .lean(); // keeps same populated result but much faster
+      .populate(populateFields)
+      .lean();
     return res.status(200).json({ message: 'Deals fetched successfully', deals });
   } catch (error) {
     console.error(error);
@@ -76,19 +105,37 @@ export const getAllDeals = async (req, res) => {
   }
 };
 
-// Get a single deal by ID
+// Get a single deal by ID - OPTIMIZED VERSION
 export const getDealById = async (req, res) => {
   const { dealId } = req.params;
+  const { fields = 'full' } = req.query;
 
   try {
+    let populateFields = [];
+    if (fields === 'basic') {
+      populateFields = [
+        { path: 'category', select: 'name' },
+        { path: 'subCategory', select: 'name' },
+        { path: 'type', select: 'name' },
+        { path: 'strategy', select: 'name' },
+        { path: 'requirement', select: 'name' },
+        { path: 'source', select: 'name' },
+        { path: 'createdBy', select: 'name' }
+      ];
+    } else {
+      populateFields = [
+        { path: 'category' },
+        { path: 'subCategory' },
+        { path: 'type' },
+        { path: 'strategy' },
+        { path: 'requirement' },
+        { path: 'source' },
+        { path: 'createdBy' }
+      ];
+    }
+
     const deal = await Deal.findById(dealId)
-      .populate('category')
-      .populate('subCategory')
-      .populate('type')
-      .populate('strategy')
-      .populate('requirement')
-      .populate('source')
-      .populate('createdBy');
+      .populate(populateFields);
 
     if (!deal) {
       return res.status(404).json({ message: 'Deal not found' });
@@ -159,7 +206,7 @@ export const deleteDeal = async (req, res) => {
   }
 };
 
-// Filter deals
+// Filter deals - OPTIMIZED VERSION
 export const filterDeals = async (req, res) => {
   try {
     const {
@@ -171,6 +218,7 @@ export const filterDeals = async (req, res) => {
       requirementId,
       sourceId,
       createdBy,
+      fields = 'basic'
     } = req.query;
 
     const filter = {};
@@ -187,15 +235,32 @@ export const filterDeals = async (req, res) => {
     if (sourceId) filter.source = sourceId;
     if (createdBy) filter.createdBy = createdBy;
 
+    let populateFields = [];
+    if (fields === 'basic') {
+      populateFields = [
+        { path: 'category', select: 'name' },
+        { path: 'subCategory', select: 'name' },
+        { path: 'type', select: 'name' },
+        { path: 'strategy', select: 'name' },
+        { path: 'requirement', select: 'name' },
+        { path: 'source', select: 'name' },
+        { path: 'createdBy', select: 'name' }
+      ];
+    } else {
+      populateFields = [
+        { path: 'category' },
+        { path: 'subCategory' },
+        { path: 'type' },
+        { path: 'strategy' },
+        { path: 'requirement' },
+        { path: 'source' },
+        { path: 'createdBy' }
+      ];
+    }
 
     const deals = await Deal.find(filter)
-      .populate('category')
-      .populate('subCategory')
-      .populate('type')
-      .populate('strategy')
-      .populate('requirement')
-      .populate('source')
-      .populate('createdBy');
+      .populate(populateFields)
+      .lean();
 
     return res.status(200).json({ message: 'Filtered deals fetched successfully', deals });
   } catch (error) {

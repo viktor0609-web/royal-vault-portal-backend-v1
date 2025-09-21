@@ -27,33 +27,38 @@ export const createCourseGroup = async (req, res) => {
   }
 };
 
-// Get all CourseGroups with courses and lectures
+// Get all CourseGroups with courses and lectures - OPTIMIZED VERSION
 export const getAllCourseGroups = async (req, res) => {
   try {
-    const { type, search } = req.query;
+    const { type, search, fields = 'basic' } = req.query;
     let query = {};
     
     // Build query based on type filter
     if (type === 'courses') {
-      // Only return groups that have courses
       query = { _id: { $in: await Course.distinct('courseGroup') } };
     } else if (type === 'bundles') {
-      // Groups with multiple courses
       const courseCounts = await Course.aggregate([
         { $group: { _id: '$courseGroup', count: { $sum: 1 } } },
         { $match: { count: { $gte: 2 } } }
       ]);
       query = { _id: { $in: courseCounts.map(c => c._id) } };
     } else if (type === 'content') {
-      // Groups that have lectures
       const courseGroupsWithLectures = await Course.distinct('courseGroup', {
         _id: { $in: await Lecture.distinct('course') }
       });
       query = { _id: { $in: courseGroupsWithLectures } };
     }
 
+    // Define field selection based on query parameter
+    let populateFields = {};
+    if (fields === 'basic') {
+      populateFields = { createdBy: 'name email' };
+    } else if (fields === 'detailed') {
+      populateFields = { createdBy: 'name email' };
+    }
+
     let courseGroups = await CourseGroup.find(query)
-      .populate('createdBy', 'name email')
+      .populate(populateFields)
       .lean();
 
     // Apply search filter if provided
@@ -64,61 +69,58 @@ export const getAllCourseGroups = async (req, res) => {
       for (const group of courseGroups) {
         let includeGroup = false;
         
-        // Search in group title and description
         if (searchRegex.test(group.title) || searchRegex.test(group.description)) {
           includeGroup = true;
         }
         
-        // Get courses for this group
-        const courses = await Course.find({ courseGroup: group._id }).lean();
-        const coursesWithLectures = [];
-        
-        for (const course of courses) {
-          // Search in course title and description
-          if (searchRegex.test(course.title) || searchRegex.test(course.description)) {
-            includeGroup = true;
+        if (fields === 'detailed' || fields === 'full') {
+          const courses = await Course.find({ courseGroup: group._id })
+            .populate('lectures', fields === 'full' ? 'title description content videoUrl videoFile relatedFiles createdBy createdAt' : 'title description')
+            .lean();
+          
+          for (const course of courses) {
+            if (searchRegex.test(course.title) || searchRegex.test(course.description)) {
+              includeGroup = true;
+            }
+            
+            if (fields === 'full' && course.lectures) {
+              const lecturesWithSearch = course.lectures.filter(lecture =>
+                searchRegex.test(lecture.title) || searchRegex.test(lecture.description)
+              );
+              if (lecturesWithSearch.length > 0) {
+                includeGroup = true;
+              }
+            }
           }
           
-          // Get lectures for this course using the lectures array
-          const lectures = course.lectures ? await Lecture.find({ _id: { $in: course.lectures } }).lean() : [];
-          const lecturesWithSearch = lectures.filter(lecture =>
-            searchRegex.test(lecture.title) || searchRegex.test(lecture.description)
-          );
-          
-          if (lecturesWithSearch.length > 0) {
-            includeGroup = true;
-          }
-          
-          coursesWithLectures.push({
-            ...course,
-            lectures
-          });
+          group.courses = courses;
+        } else {
+          // For basic view, just get course count
+          const courseCount = await Course.countDocuments({ courseGroup: group._id });
+          group.courses = [{ count: courseCount }];
         }
         
         if (includeGroup) {
-          searchResults.push({
-            ...group,
-            courses: coursesWithLectures
-          });
+          searchResults.push(group);
         }
       }
       
       courseGroups = searchResults;
     } else {
-      // If no search, populate courses and lectures for all groups
-      for (const group of courseGroups) {
-        const courses = await Course.find({ courseGroup: group._id }).lean();
-        const coursesWithLectures = [];
-        
-        for (const course of courses) {
-          const lectures = course.lectures ? await Lecture.find({ _id: { $in: course.lectures } }).lean() : [];
-          coursesWithLectures.push({
-            ...course,
-            lectures
-          });
+      // If no search, populate based on fields parameter
+      if (fields === 'detailed' || fields === 'full') {
+        for (const group of courseGroups) {
+          const courses = await Course.find({ courseGroup: group._id })
+            .populate('lectures', fields === 'full' ? 'title description content videoUrl videoFile relatedFiles createdBy createdAt' : 'title description')
+            .lean();
+          group.courses = courses;
         }
-        
-        group.courses = coursesWithLectures;
+      } else {
+        // For basic view, just get course counts
+        for (const group of courseGroups) {
+          const courseCount = await Course.countDocuments({ courseGroup: group._id });
+          group.courses = [{ count: courseCount }];
+        }
       }
     }
 
@@ -129,20 +131,33 @@ export const getAllCourseGroups = async (req, res) => {
   }
 };
 
-// Get single CourseGroup by ID
+// Get single CourseGroup by ID - OPTIMIZED VERSION
 export const getCourseGroupById = async (req, res) => {
   try {
+    const { fields = 'full' } = req.query;
+    
     const courseGroup = await CourseGroup.findById(req.params.id)
       .populate('createdBy', 'name email');
     
     if (!courseGroup) return res.status(404).json({ message: 'CourseGroup not found' });
     
-    // Populate courses and lectures
+    // Populate courses and lectures based on fields parameter
     const courses = await Course.find({ courseGroup: courseGroup._id });
     const coursesWithLectures = [];
     
     for (const course of courses) {
-      const lectures = course.lectures ? await Lecture.find({ _id: { $in: course.lectures } }) : [];
+      let lectures = [];
+      if (fields === 'full' && course.lectures) {
+        lectures = await Lecture.find({ _id: { $in: course.lectures } })
+          .populate('createdBy', 'name email')
+          .populate('completedBy', 'name email')
+          .lean();
+      } else if (fields === 'detailed' && course.lectures) {
+        lectures = await Lecture.find({ _id: { $in: course.lectures } })
+          .select('title description videoUrl videoFile relatedFiles')
+          .lean();
+      }
+      
       coursesWithLectures.push({
         ...course.toObject(),
         lectures
@@ -254,13 +269,33 @@ export const createCourse = async (req, res) => {
   }
 };
 
-// Get all Courses
+// Get all Courses - OPTIMIZED VERSION
 export const getAllCourses = async (req, res) => {
   try {
+    const { fields = 'basic' } = req.query;
+    
+    let populateFields = {};
+    if (fields === 'basic') {
+      populateFields = { 
+        createdBy: 'name email',
+        courseGroup: 'title description icon'
+      };
+    } else if (fields === 'detailed') {
+      populateFields = { 
+        createdBy: 'name email',
+        courseGroup: 'title description icon',
+        lectures: 'title description videoUrl videoFile'
+      };
+    } else if (fields === 'full') {
+      populateFields = { 
+        createdBy: 'name email',
+        courseGroup: 'title description icon',
+        lectures: 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy'
+      };
+    }
+    
     const courses = await Course.find()
-      .populate('createdBy', 'name email')
-      .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description content videoUrl videoFile relatedFiles createdBy createdAt')
+      .populate(populateFields)
       .lean();
     res.json(courses);
   } catch (error) {
@@ -268,13 +303,26 @@ export const getAllCourses = async (req, res) => {
   }
 };
 
-// Get Course by ID
+// Get Course by ID - OPTIMIZED VERSION
 export const getCourseById = async (req, res) => {
   try {
+    const { fields = 'full' } = req.query;
+    
+    let populateFields = {
+      createdBy: 'name email',
+      courseGroup: 'title description icon'
+    };
+    
+    if (fields === 'full') {
+      populateFields.lectures = 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy';
+    } else if (fields === 'detailed') {
+      populateFields.lectures = 'title description videoUrl videoFile relatedFiles';
+    } else if (fields === 'basic') {
+      populateFields.lectures = 'title description';
+    }
+    
     const course = await Course.findById(req.params.id)
-      .populate('createdBy', 'name email')
-      .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy');
+      .populate(populateFields);
     
     if (!course) return res.status(404).json({ message: 'Course not found' });
     
