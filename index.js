@@ -18,6 +18,8 @@ const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'http://localhost:3000', // Add common dev port
+  'https://localhost:5173', // Add HTTPS variant
 ];
 
 app.use(cors({
