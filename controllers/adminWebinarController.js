@@ -1,5 +1,84 @@
 import Webinar from '../models/Webinar.js';
 
+// Get all webinars for admin - OPTIMIZED VERSION
+export const getAllWebinars = async (req, res) => {
+  try {
+    const { fields = 'full' } = req.query;
+    
+    let selectFields = {};
+    let populateFields = {};
+    
+    if (fields === 'basic') {
+      selectFields = 'title description schedule maxAttendees attendees createdAt';
+      populateFields = {
+        'attendees.user': 'name email',
+        'participants.hosts': 'name email',
+        'participants.guestSpeakers': 'name email'
+      };
+    } else if (fields === 'detailed') {
+      selectFields = 'title description schedule maxAttendees attendees settings createdAt';
+      populateFields = {
+        'attendees.user': 'name email',
+        'participants.hosts': 'name email',
+        'participants.guestSpeakers': 'name email'
+      };
+    } else {
+      populateFields = {
+        'attendees.user': 'name email',
+        'participants.hosts': 'name email',
+        'participants.guestSpeakers': 'name email'
+      };
+    }
+    
+    const webinars = await Webinar.find()
+      .select(selectFields)
+      .populate(populateFields)
+      .lean();
+    
+    res.status(200).json({ message: 'Webinars fetched successfully', webinars });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching webinars' });
+  }
+};
+
+// Get webinar by ID for admin - OPTIMIZED VERSION
+export const getWebinarById = async (req, res) => {
+  try {
+    const { webinarId } = req.params;
+    const { fields = 'full' } = req.query;
+    
+    let selectFields = {};
+    let populateFields = {};
+    
+    if (fields === 'basic') {
+      selectFields = 'title description schedule maxAttendees attendees';
+      populateFields = {
+        'attendees.user': 'name email'
+      };
+    } else {
+      populateFields = {
+        'attendees.user': 'name email',
+        'participants.hosts': 'name email',
+        'participants.guestSpeakers': 'name email'
+      };
+    }
+    
+    const webinar = await Webinar.findById(webinarId)
+      .select(selectFields)
+      .populate(populateFields);
+    
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+    
+    res.status(200).json({ message: 'Webinar fetched successfully', webinar });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching webinar' });
+  }
+};
+
 // Admin creates a new webinar
 export const createWebinar = async (req, res) => {
   const { title, description, schedule, maxAttendees, settings, participants } = req.body;
