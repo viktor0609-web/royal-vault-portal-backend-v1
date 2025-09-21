@@ -563,7 +563,7 @@ export const deleteLecture = async (req, res) => {
   }
 };
 
-// Mark Lecture as completed by a User
+// Toggle Lecture completion status for a User
 export const completeLecture = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -571,12 +571,19 @@ export const completeLecture = async (req, res) => {
     
     if (!lecture) return res.status(404).json({ message: 'Lecture not found' });
     
-    if (!lecture.completedBy.includes(userId)) {
+    const isCompleted = lecture.completedBy.includes(userId);
+    
+    if (isCompleted) {
+      // Remove user from completedBy array (uncomplete)
+      lecture.completedBy = lecture.completedBy.filter(id => id.toString() !== userId.toString());
+      await lecture.save();
+      res.json({ message: 'Lecture marked as incomplete', completed: false });
+    } else {
+      // Add user to completedBy array (complete)
       lecture.completedBy.push(userId);
       await lecture.save();
+      res.json({ message: 'Lecture marked as completed', completed: true });
     }
-    
-    res.json({ message: 'Lecture marked as completed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
