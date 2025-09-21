@@ -5,29 +5,29 @@ export const getAllWebinars = async (req, res) => {
   try {
     const { fields = 'full' } = req.query;
     
-    let selectFields = {};
-    let populateFields = {};
+    let selectFields = '';
+    let populateFields = [];
     
     if (fields === 'basic') {
       selectFields = 'title description schedule maxAttendees attendees createdAt';
-      populateFields = {
-        'attendees.user': 'name email',
-        'participants.hosts': 'name email',
-        'participants.guestSpeakers': 'name email'
-      };
+      populateFields = [
+        { path: 'attendees.user', select: 'name email' },
+        { path: 'participants.hosts', select: 'name email' },
+        { path: 'participants.guestSpeakers', select: 'name email' }
+      ];
     } else if (fields === 'detailed') {
       selectFields = 'title description schedule maxAttendees attendees settings createdAt';
-      populateFields = {
-        'attendees.user': 'name email',
-        'participants.hosts': 'name email',
-        'participants.guestSpeakers': 'name email'
-      };
+      populateFields = [
+        { path: 'attendees.user', select: 'name email' },
+        { path: 'participants.hosts', select: 'name email' },
+        { path: 'participants.guestSpeakers', select: 'name email' }
+      ];
     } else {
-      populateFields = {
-        'attendees.user': 'name email',
-        'participants.hosts': 'name email',
-        'participants.guestSpeakers': 'name email'
-      };
+      populateFields = [
+        { path: 'attendees.user', select: 'name email' },
+        { path: 'participants.hosts', select: 'name email' },
+        { path: 'participants.guestSpeakers', select: 'name email' }
+      ];
     }
     
     const webinars = await Webinar.find()
@@ -48,20 +48,20 @@ export const getWebinarById = async (req, res) => {
     const { webinarId } = req.params;
     const { fields = 'full' } = req.query;
     
-    let selectFields = {};
-    let populateFields = {};
+    let selectFields = '';
+    let populateFields = [];
     
     if (fields === 'basic') {
       selectFields = 'title description schedule maxAttendees attendees';
-      populateFields = {
-        'attendees.user': 'name email'
-      };
+      populateFields = [
+        { path: 'attendees.user', select: 'name email' }
+      ];
     } else {
-      populateFields = {
-        'attendees.user': 'name email',
-        'participants.hosts': 'name email',
-        'participants.guestSpeakers': 'name email'
-      };
+      populateFields = [
+        { path: 'attendees.user', select: 'name email' },
+        { path: 'participants.hosts', select: 'name email' },
+        { path: 'participants.guestSpeakers', select: 'name email' }
+      ];
     }
     
     const webinar = await Webinar.findById(webinarId)

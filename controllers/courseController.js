@@ -50,11 +50,11 @@ export const getAllCourseGroups = async (req, res) => {
     }
 
     // Define field selection based on query parameter
-    let populateFields = {};
+    let populateFields = 'createdBy';
     if (fields === 'basic') {
-      populateFields = { createdBy: 'name email' };
+      populateFields = { path: 'createdBy', select: 'name email' };
     } else if (fields === 'detailed') {
-      populateFields = { createdBy: 'name email' };
+      populateFields = { path: 'createdBy', select: 'name email' };
     }
 
     let courseGroups = await CourseGroup.find(query)
@@ -274,24 +274,24 @@ export const getAllCourses = async (req, res) => {
   try {
     const { fields = 'basic' } = req.query;
     
-    let populateFields = {};
+    let populateFields = [];
     if (fields === 'basic') {
-      populateFields = { 
-        createdBy: 'name email',
-        courseGroup: 'title description icon'
-      };
+      populateFields = [
+        { path: 'createdBy', select: 'name email' },
+        { path: 'courseGroup', select: 'title description icon' }
+      ];
     } else if (fields === 'detailed') {
-      populateFields = { 
-        createdBy: 'name email',
-        courseGroup: 'title description icon',
-        lectures: 'title description videoUrl videoFile'
-      };
+      populateFields = [
+        { path: 'createdBy', select: 'name email' },
+        { path: 'courseGroup', select: 'title description icon' },
+        { path: 'lectures', select: 'title description videoUrl videoFile' }
+      ];
     } else if (fields === 'full') {
-      populateFields = { 
-        createdBy: 'name email',
-        courseGroup: 'title description icon',
-        lectures: 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy'
-      };
+      populateFields = [
+        { path: 'createdBy', select: 'name email' },
+        { path: 'courseGroup', select: 'title description icon' },
+        { path: 'lectures', select: 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy' }
+      ];
     }
     
     const courses = await Course.find()
@@ -308,17 +308,17 @@ export const getCourseById = async (req, res) => {
   try {
     const { fields = 'full' } = req.query;
     
-    let populateFields = {
-      createdBy: 'name email',
-      courseGroup: 'title description icon'
-    };
+    let populateFields = [
+      { path: 'createdBy', select: 'name email' },
+      { path: 'courseGroup', select: 'title description icon' }
+    ];
     
     if (fields === 'full') {
-      populateFields.lectures = 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy';
+      populateFields.push({ path: 'lectures', select: 'title description content videoUrl videoFile relatedFiles createdBy createdAt completedBy' });
     } else if (fields === 'detailed') {
-      populateFields.lectures = 'title description videoUrl videoFile relatedFiles';
+      populateFields.push({ path: 'lectures', select: 'title description videoUrl videoFile relatedFiles' });
     } else if (fields === 'basic') {
-      populateFields.lectures = 'title description';
+      populateFields.push({ path: 'lectures', select: 'title description' });
     }
     
     const course = await Course.findById(req.params.id)
