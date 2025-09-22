@@ -75,7 +75,7 @@ export const getAllCourseGroups = async (req, res) => {
         
         if (fields === 'detailed' || fields === 'full') {
           const courses = await Course.find({ courseGroup: group._id })
-            .populate('lectures', fields === 'full' ? 'title description content videoUrl videoFile relatedFiles createdBy createdAt' : 'title description')
+            .populate('lectures', fields === 'full' ? 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt' : 'title description')
             .lean();
           
           for (const course of courses) {
@@ -111,7 +111,7 @@ export const getAllCourseGroups = async (req, res) => {
       if (fields === 'detailed' || fields === 'full') {
         for (const group of courseGroups) {
           const courses = await Course.find({ courseGroup: group._id })
-            .populate('lectures', fields === 'full' ? 'title description content videoUrl videoFile relatedFiles createdBy createdAt' : 'title description')
+            .populate('lectures', fields === 'full' ? 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt' : 'title description')
             .lean();
           group.courses = courses;
         }
@@ -154,7 +154,7 @@ export const getCourseGroupById = async (req, res) => {
           .lean();
       } else if (fields === 'detailed' && course.lectures) {
         lectures = await Lecture.find({ _id: { $in: course.lectures } })
-          .select('title description videoUrl videoFile relatedFiles')
+          .select('title description youtubeUrl youtubeVideoId relatedFiles')
           .lean();
       }
       
@@ -374,9 +374,9 @@ export const createLecture = async (req, res) => {
       title, 
       description, 
       content,
-      videoUrl, 
-      videoFile,
-      relatedFiles = [],
+      youtubeUrl, 
+      youtubeVideoId,
+      relatedFiles = [],  
       courseId 
     } = req.body;
     
@@ -418,8 +418,8 @@ export const createLecture = async (req, res) => {
       title, 
       description, 
       content,
-      videoUrl, 
-      videoFile,
+      youtubeUrl, 
+      youtubeVideoId,
       relatedFiles: cleanedRelatedFiles,
       createdBy
     });
@@ -480,7 +480,7 @@ export const updateLecture = async (req, res) => {
       title, 
       description, 
       content,
-      videoUrl, 
+      youtubeUrl, 
       videoFile,
       relatedFiles 
     } = req.body;
@@ -521,8 +521,8 @@ export const updateLecture = async (req, res) => {
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (content !== undefined) updateData.content = content;
-    if (videoUrl !== undefined) updateData.videoUrl = videoUrl;
-    if (videoFile !== undefined) updateData.videoFile = videoFile;
+    if (youtubeUrl !== undefined) updateData.youtubeUrl = youtubeUrl;
+    if (youtubeVideoId !== undefined) updateData.youtubeVideoId = youtubeVideoId;
     // Always update relatedFiles if it's provided (even if empty array)
     if (relatedFiles !== undefined) {
       console.log('Updating relatedFiles with:', cleanedRelatedFiles);
