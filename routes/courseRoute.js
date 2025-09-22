@@ -1,20 +1,15 @@
 import express from 'express';
 import {
-  // CourseGroup routes
   createCourseGroup,
   getAllCourseGroups,
   getCourseGroupById,
   updateCourseGroup,
   deleteCourseGroup,
-  
-  // Course routes
   createCourse,
   getAllCourses,
   getCourseById,
   updateCourse,
   deleteCourse,
-  
-  // Lecture routes
   createLecture,
   getAllLectures,
   getLectureById,
@@ -27,61 +22,27 @@ import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// ------------------ CourseGroup Routes ------------------
+// CourseGroup routes
+router.get('/groups', getAllCourseGroups); // Get all course groups
+router.get('/groups/:id', getCourseGroupById); // Get a course group by ID
+router.post('/groups', protect, authorize('admin'), createCourseGroup); // Create a new course group
+router.put('/groups/:id', protect, authorize('admin'), updateCourseGroup); // Update a course group
+router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup); // Delete a course group
 
-// Create a new CourseGroup (only admins)
-router.post('/groups', protect, authorize('admin'), createCourseGroup);
+// Course routes
+router.get('/courses', getAllCourses); // Get all courses
+router.get('/courses/:id', getCourseById); // Get a course by ID
+router.post('/courses/:groupId', protect, authorize('admin'), createCourse); // Create a new course
+router.put('/courses/:id', protect, authorize('admin'), updateCourse); // Update a course
+router.delete('/courses/:id', protect, authorize('admin'), deleteCourse); // Delete a course
 
-// Get all CourseGroups (public access)
-router.get('/groups', getAllCourseGroups);
-
-// Get a single CourseGroup by ID (public access)
-router.get('/groups/:id', getCourseGroupById);
-
-// Update a CourseGroup (only admins)
-router.put('/groups/:id', protect, authorize('admin'), updateCourseGroup);
-
-// Delete a CourseGroup (only admins)
-router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup);
-
-// ------------------ Course Routes ------------------
-
-// Create a new Course (only admins)
-router.post('/courses/:groupId', protect, authorize('admin'), createCourse);
-
-// Get all Courses (public access)
-router.get('/courses', getAllCourses);
-
-// Get a single Course by ID (public access)
-router.get('/courses/:id', getCourseById);
-
-// Update a Course (only admins)
-router.put('/courses/:id', protect, authorize('admin'), updateCourse);
-
-// Delete a Course (only admins)
-router.delete('/courses/:id', protect, authorize('admin'), deleteCourse);
-
-// ------------------ Lecture Routes ------------------
-
-// Create a new Lecture (only admins)
-router.post('/lectures', protect, authorize('admin'), createLecture);
-
-// Get all Lectures (any logged-in user)
-router.get('/lectures', protect, getAllLectures);
-
-// Get a single Lecture by ID
-router.get('/lectures/:id', protect, getLectureById);
-
-// Update a Lecture (only admins)
-router.put('/lectures/:id', protect, authorize('admin'), updateLecture);
-
-// Delete a Lecture (only admins)
-router.delete('/lectures/:id', protect, authorize('admin'), deleteLecture);
-
-// Mark Lecture as completed by a User (any logged-in user)
-router.post('/lectures/:id/complete', protect, completeLecture);
-
-// Save YouTube video URL to a lecture (only admins)
-router.post('/lectures/:lectureId/youtube', protect, authorize('admin'), saveYouTubeVideo);
+// Lecture routes
+router.get('/lectures', protect, getAllLectures); // Get all lectures
+router.get('/lectures/:id', protect, getLectureById); // Get a lecture by ID
+router.post('/lectures', protect, authorize('admin'), createLecture); // Create a new lecture
+router.put('/lectures/:id', protect, authorize('admin'), updateLecture); // Update a lecture
+router.delete('/lectures/:id', protect, authorize('admin'), deleteLecture); // Delete a lecture
+router.post('/lectures/:id/complete', protect, completeLecture); // Mark a lecture as completed
+router.post('/lectures/:lectureId/youtube', protect, authorize('admin'), saveYouTubeVideo); // Save a YouTube video URL to a lecture
 
 export default router;

@@ -15,16 +15,20 @@ import uploadRoutes from './uploadRoutes.js'; // Import upload routes
 const router = express.Router();
 
 // Use the routes for different API endpoints
-router.use('/webinars', webinarRoutes);  // All webinar-related routes
 router.use('/auth', authRoutes);          // All authentication-related routes
+
+router.use('/webinars', webinarRoutes);  // All webinar-related routes
 router.use('/courses', courseRoutes); // Course-related routes
 router.use('/deals', dealRoutes); // Deal-related routes
-router.use('/requirements', requirementRoutes); // Requirement-related routes
-router.use('/sources', sourceRoutes); // Source-related routes
-router.use('/strategies', strategyRoutes); // Strategy-related routes
-router.use('/types', typeRoutes); // Type-related routes
+
+// I must fix this part of the code but it is not important for now
 router.use('/categories', categoryRoutes); // Category-related routes
 router.use('/sub-categories', subCategoryRoutes); // Sub-category-related routes    
+router.use('/types', typeRoutes); // Type-related routes
+router.use('/sources', sourceRoutes); // Source-related routes
+router.use('/requirements', requirementRoutes); // Requirement-related routes
+router.use('/strategies', strategyRoutes); // Strategy-related routes
+
 router.use('/upload', uploadRoutes); // Upload-related routes
 
 export default router;

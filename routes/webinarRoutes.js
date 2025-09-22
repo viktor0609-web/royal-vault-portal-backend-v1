@@ -14,30 +14,15 @@ import {
 
 const router = express.Router();
 
-// User Routes
+// User routes
+router.post('/:webinarId/register', protect, registerForWebinar); // Register user for a webinar
+router.post('/:webinarId/attend', protect, markAsAttended); // Mark user as attended for a webinar
 
-// Register user for a webinar (protected route)
-router.post('/:webinarId/register', protect, registerForWebinar);
+// Admin routes
+router.get('/admin/:webinarId/attendees', protect, authorize('admin'), viewAttendees); // View all attendees for a specific webinar
+router.post('/admin/create', protect, authorize('admin'), createWebinar); // Create a new webinar
+router.put('/admin/:webinarId/update', protect, authorize('admin'), updateWebinar); // Update an existing webinar
+router.delete('/admin/:webinarId/delete', protect, authorize('admin'), deleteWebinar); // Delete a webinar
+router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended); // Mark a user as attended for a specific webinar
 
-// Mark user as attended for a webinar (protected route)
-router.post('/:webinarId/attend', protect, markAsAttended);
-
-// Admin Routes
-
-// Admin creates a new webinar (protected & authorized for admin only)
-router.post('/admin/create', protect, authorize('admin'), createWebinar);
-
-// Admin updates an existing webinar (protected & authorized for admin only)
-router.put('/admin/:webinarId/update', protect, authorize('admin'), updateWebinar);
-
-// Admin deletes a webinar (protected & authorized for admin only)
-router.delete('/admin/:webinarId/delete', protect, authorize('admin'), deleteWebinar);
-
-
-// Admin views all attendees for a specific webinar (protected & authorized for admin only)
-router.get('/admin/:webinarId/attendees', protect, authorize('admin'), viewAttendees);
-
-// Admin marks a user as attended for a specific webinar (protected & authorized for admin only)
-router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended);
-
-export default router; // Use export default here
+export default router;
