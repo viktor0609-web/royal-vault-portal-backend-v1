@@ -40,6 +40,9 @@ export const getAllWebinars = async (req, res) => {
       .populate(populateFields)
       .sort({ createdAt: -1 })
       .lean();
+
+      console.log("webinars:", webinars);
+      
     
     res.status(200).json({ 
       message: 'Webinars fetched successfully', 
@@ -357,10 +360,11 @@ export const getPublicWebinars = async (req, res) => {
     }
     
     if (fields === 'basic') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments';
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments attendees';
     } else {
       populateFields = [
-        { path: 'createdBy', select: 'name email' }
+        { path: 'createdBy', select: 'name email' },
+        { path: 'attendees.user', select: 'name email' }
       ];
     }
     
@@ -406,8 +410,11 @@ export const getPublicWebinarById = async (req, res) => {
 // Register user for a webinar
 export const registerForWebinar = async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user._id; // Get user ID from the user object
     const { webinarId } = req.params;
+
+    console.log('User ID:', userId);
+    console.log('Webinar ID:', webinarId);
 
     // Find the webinar
     const webinar = await Webinar.findById(webinarId);
@@ -416,12 +423,12 @@ export const registerForWebinar = async (req, res) => {
     }
 
     // Check if the user is already registered
-    if (webinar.attendees.some((attendee) => attendee.user.toString() === userId)) {
+    if (webinar.attendees.some((attendee) => attendee.user.toString() === userId.toString())) {
       return res.status(400).json({ message: 'User is already registered for this webinar' });
     }
 
     // Check if max attendees have been reached
-    const maxAttendees = webinar.attendOverwrite || webinar.maxAttendees || 100;
+    const maxAttendees = webinar.attendOverwrite || 100;
     if (webinar.attendees.length >= maxAttendees) {
       return res.status(400).json({ message: 'Webinar is full' });
     }
@@ -440,7 +447,7 @@ export const registerForWebinar = async (req, res) => {
 // Mark user as attended (user side)
 export const markAsAttended = async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user._id; // Get user ID from the user object
     const { webinarId } = req.params;
 
     // Find the webinar
