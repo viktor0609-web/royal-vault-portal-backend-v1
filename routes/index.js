@@ -11,6 +11,7 @@ import typeRoutes from './typeRoutes.js';
 import categoryRoutes from './categoryRoutes.js'; // Import category routes
 import subCategoryRoutes from './subCategoryRoutes.js'; // Import sub-category routes
 import uploadRoutes from './uploadRoutes.js'; // Import upload routes
+import promotionalSmsListRoutes from './promotionalSmsListRoutes.js'; // Import promotional SMS list routes
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use('/requirements', requirementRoutes); // Requirement-related routes
 router.use('/strategies', strategyRoutes); // Strategy-related routes
 
 router.use('/upload', uploadRoutes); // Upload-related routes
+router.use('/promotional-sms-lists', promotionalSmsListRoutes); // Promotional SMS list-related routes
 
 export default router;

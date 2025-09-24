@@ -424,8 +424,6 @@ export const createLecture = async (req, res) => {
       createdBy
     });
     
-    console.log('Created lecture:', lecture, videoFile);
-    
     // Add lecture to course's lectures array
     if (courseId) {
       await Course.findByIdAndUpdate(courseId, {
