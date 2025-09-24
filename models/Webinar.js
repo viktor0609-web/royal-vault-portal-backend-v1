@@ -1,94 +1,126 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// Updated Webinar Schema to include attendance status
+// Clean Webinar Schema with only necessary fields
 const webinarSchema = new Schema({
-  title: {
+  // Core webinar fields
+  streamType: {
+    type: String,
+    enum: ['Live Call', 'Webinar'],
+    required: true,
+  },
+  name: {
     type: String,
     required: true,
     trim: true,
   },
-  description: {
+  slug: {
     type: String,
     required: true,
+    unique: true,
+    trim: true,
   },
-  schedule: {
-    date: {
-      type: Date,
-      required: true,
-    },
-    startTime: {
-      type: String,
-      required: true,
-    },
-    durationMinutes: {
-      type: Number,
-      required: true,
-      default: 60,
-    },
-  },
-  maxAttendees: {
-    type: Number,
+  date: {
+    type: Date,
     required: true,
+  },
+  
+  // Line fields (Line1 is required, Line2 and Line3 are optional)
+  line1: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  line2: {
+    type: String,
+    trim: true,
+  },
+  line3: {
+    type: String,
+    trim: true,
+  },
+  
+  // Status and display settings
+  status: {
+    type: String,
+    enum: ['Scheduled', 'Waiting', 'In Progress', 'Ended'],
+    required: true,
+    default: 'Scheduled',
+  },
+  displayComments: {
+    type: String,
+    enum: ['Yes', 'No'],
+    required: true,
+    default: 'Yes',
+  },
+  portalDisplay: {
+    type: String,
+    enum: ['Yes', 'No'],
+    required: true,
+    default: 'Yes',
+  },
+  
+  // Optional fields
+  calInvDesc: {
+    type: String,
+    trim: true,
+  },
+  proWorkId: {
+    type: String,
+    trim: true,
+  },
+  reminderSms: {
+    type: String,
+    trim: true,
+  },
+  proSmsList: {
+    type: String,
+    // type: Schema.Types.ObjectId,
+    // ref: 'PromotionalSmsList',
+  },
+  proSms: {
+    type: String,
+    trim: true,
+  },
+  proSmsTime: {
+    type: Number,
+    default: 60, // in minutes
+  },
+  attendOverwrite: {
+    type: Number,
     default: 100,
   },
-  participants: {
-    hosts: [{
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    }],
-    guestSpeakers: [{
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    }],
+  recording: {
+    type: String,
+    trim: true,
   },
+  
+  // Registration and attendance tracking
   attendees: [{
     user: {
       type: Schema.Types.ObjectId,
-      ref: 'User', // Refers to the User model
+      ref: 'User',
+      required: true,
     },
     attendanceStatus: {
       type: String,
       enum: ['registered', 'attended', 'missed'],
       default: 'registered',
     },
+    registeredAt: {
+      type: Date,
+      default: Date.now,
+    },
   }],
-  settings: {
-    recordWebinar: {
-      type: Boolean,
-      default: false,
-    },
-    publicWebinar: {
-      type: Boolean,
-      default: true,
-    },
-    requireRegistration: {
-      type: Boolean,
-      default: true,
-    },
-    reminders: {
-      email24h: {
-        type: Boolean,
-        default: true,
-      },
-      email1h: {
-        type: Boolean,
-        default: true,
-      },
-      sms30min: {
-        type: Boolean,
-        default: true,
-      },
-    },
+  
+  // Creator tracking
+  createdBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
+}, {
+  timestamps: true,
 });
 
 // Create the Webinar model
