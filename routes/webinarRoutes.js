@@ -14,7 +14,8 @@ import {
   getPublicWebinars,
   getPublicWebinarById,
   registerForWebinar,
-  markAsAttended
+  markAsAttended,
+  unregisterFromWebinar
 } from '../controllers/webinarController.js';
 
 const router = express.Router();
@@ -26,6 +27,7 @@ router.get('/public/:webinarId', getPublicWebinarById); // Get public webinar by
 // ==================== USER ROUTES ====================
 router.post('/:webinarId/register', protect, registerForWebinar); // Register user for a webinar
 router.post('/:webinarId/attend', protect, markAsAttended); // Mark user as attended for a webinar
+router.delete('/:webinarId/unregister', protect, unregisterFromWebinar); // Unregister user from a webinar
 
 // ==================== ADMIN ROUTES ====================
 router.get('/admin', protect, authorize('admin'), getAllWebinars); // Get all webinars for admin

@@ -29,7 +29,6 @@ export const getAllWebinars = async (req, res) => {
       ];
     } else {
       populateFields = [
-        { path: 'attendees.user', select: 'name email' },
         { path: 'proSmsList', select: 'name' },
         { path: 'createdBy', select: 'name email' }
       ];
@@ -68,7 +67,6 @@ export const getWebinarById = async (req, res) => {
       selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay';
     } else {
       populateFields = [
-        { path: 'attendees.user', select: 'name email' },
         { path: 'proSmsList', select: 'name' },
         { path: 'createdBy', select: 'name email' }
       ];
@@ -269,8 +267,7 @@ export const viewAttendees = async (req, res) => {
   try {
     const { webinarId } = req.params;
 
-    const webinar = await Webinar.findById(webinarId)
-      .populate('attendees.user', 'name email');
+    const webinar = await Webinar.findById(webinarId);
 
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
@@ -362,9 +359,9 @@ export const getPublicWebinars = async (req, res) => {
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments attendees';
     } else {
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments attendees';
       populateFields = [
-        { path: 'createdBy', select: 'name email' },
-        { path: 'attendees.user', select: 'name email' }
+        { path: 'createdBy', select: 'name email' }
       ];
     }
     
@@ -470,5 +467,37 @@ export const markAsAttended = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error marking attendance' });
+  }
+};
+
+// Unregister user from a webinar
+export const unregisterFromWebinar = async (req, res) => {
+  try {
+    const userId = req.user._id; // Get user ID from the user object
+    const { webinarId } = req.params;
+
+    console.log('User ID:', userId);
+    console.log('Webinar ID:', webinarId);
+
+    // Find the webinar
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Check if the user is registered
+    const attendeeIndex = webinar.attendees.findIndex((attendee) => attendee.user.toString() === userId.toString());
+    if (attendeeIndex === -1) {
+      return res.status(400).json({ message: 'User is not registered for this webinar' });
+    }
+
+    // Remove user from attendees list
+    webinar.attendees.splice(attendeeIndex, 1);
+    await webinar.save();
+
+    res.status(200).json({ message: 'Successfully unregistered from the webinar' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error unregistering from the webinar' });
   }
 };
