@@ -22,7 +22,7 @@ export const getAllWebinars = async (req, res) => {
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay createdAt';
     } else if (fields === 'detailed') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite recording createdAt';
+      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite recording createdAt attendees';
       populateFields = [
         { path: 'proSmsList', select: 'name' },
         { path: 'createdBy', select: 'name email' }
