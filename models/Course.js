@@ -31,8 +31,7 @@ const lectureSchema = new Schema(
     title: { type: String, required: true },
     description: { type: String },
     content: { type: String }, // Rich text content
-    youtubeUrl: { type: String }, // YouTube video URL
-    youtubeVideoId: { type: String }, // Extracted YouTube video ID for embedding
+    videoUrl: { type: String }, // Video URL (MP4, WebM, OGG, etc.)
     relatedFiles: [{
       name: { type: String },
       uploadedUrl: { type: String } // Uploaded file URL
@@ -43,25 +42,7 @@ const lectureSchema = new Schema(
   { timestamps: true }
 );
 
-// Helper function to extract YouTube video ID from URL
-const extractYouTubeVideoId = (url) => {
-  if (!url) return null;
-  
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /youtube\.com\/v\/([^&\n?#]+)/,
-    /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-  ];
-  
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  
-  return null;
-};
-
-// Add pre-save middleware to validate related files and extract YouTube video ID
+// Add pre-save middleware to validate related files
 lectureSchema.pre('save', function(next) {
   // Validate related files
   if (this.relatedFiles && this.relatedFiles.length > 0) {
@@ -74,11 +55,6 @@ lectureSchema.pre('save', function(next) {
         return next(error);
       }
     }
-  }
-  
-  // Extract YouTube video ID from URL (if provided)
-  if (this.youtubeUrl) {
-    this.youtubeVideoId = extractYouTubeVideoId(this.youtubeUrl);
   }
   
   next();
