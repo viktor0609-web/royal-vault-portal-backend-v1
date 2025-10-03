@@ -46,3 +46,7 @@ local.env
 
 # Ignore config secrets
 config/local.js
+
+uploads
+uploads/*
+uploads/**/*    
