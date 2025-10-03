@@ -75,7 +75,7 @@ export const getAllCourseGroups = async (req, res) => {
         
         if (fields === 'detailed' || fields === 'full') {
           const courses = await Course.find({ courseGroup: group._id })
-            .populate('lectures', fields === 'full' ? 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt' : 'title description')
+            .populate('lectures', fields === 'full' ? 'title description content videoUrl relatedFiles createdBy createdAt' : 'title description')
             .lean();
           
           for (const course of courses) {
@@ -111,7 +111,7 @@ export const getAllCourseGroups = async (req, res) => {
       if (fields === 'detailed' || fields === 'full') {
         for (const group of courseGroups) {
           const courses = await Course.find({ courseGroup: group._id })
-            .populate('lectures', fields === 'full' ? 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt' : 'title description')
+            .populate('lectures', fields === 'full' ? 'title description content videoUrl relatedFiles createdBy createdAt' : 'title description')
             .lean();
           group.courses = courses;
         }
@@ -154,7 +154,7 @@ export const getCourseGroupById = async (req, res) => {
           .lean();
       } else if (fields === 'detailed' && course.lectures) {
         lectures = await Lecture.find({ _id: { $in: course.lectures } })
-          .select('title description youtubeUrl youtubeVideoId relatedFiles')
+          .select('title description videoUrl relatedFiles')
           .lean();
       }
       
@@ -284,13 +284,13 @@ export const getAllCourses = async (req, res) => {
       populateFields = [
         { path: 'createdBy', select: 'name email' },
         { path: 'courseGroup', select: 'title description icon' },
-        { path: 'lectures', select: 'title description youtubeUrl youtubeVideoId' }
+        { path: 'lectures', select: 'title description videoUrl' }
       ];
     } else if (fields === 'full') {
       populateFields = [
         { path: 'createdBy', select: 'name email' },
         { path: 'courseGroup', select: 'title description icon' },
-        { path: 'lectures', select: 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt completedBy' }
+        { path: 'lectures', select: 'title description content videoUrl relatedFiles createdBy createdAt completedBy' }
       ];
     }
     
@@ -314,9 +314,9 @@ export const getCourseById = async (req, res) => {
     ];
     
     if (fields === 'full') {
-      populateFields.push({ path: 'lectures', select: 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt completedBy' });
+      populateFields.push({ path: 'lectures', select: 'title description content videoUrl relatedFiles createdBy createdAt completedBy' });
     } else if (fields === 'detailed') {
-      populateFields.push({ path: 'lectures', select: 'title description youtubeUrl youtubeVideoId relatedFiles' });
+      populateFields.push({ path: 'lectures', select: 'title description videoUrl relatedFiles' });
     } else if (fields === 'basic') {
       populateFields.push({ path: 'lectures', select: 'title description' });
     }
@@ -338,7 +338,7 @@ export const updateCourse = async (req, res) => {
     const updated = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('createdBy', 'name email')
       .populate('courseGroup', 'title description icon')
-      .populate('lectures', 'title description content youtubeUrl youtubeVideoId relatedFiles createdBy createdAt completedBy');
+      .populate('lectures', 'title description content videoUrl relatedFiles createdBy createdAt completedBy');
     if (!updated) return res.status(404).json({ message: 'Course not found' });
     res.json(updated);
   } catch (error) {
@@ -374,8 +374,7 @@ export const createLecture = async (req, res) => {
       title, 
       description, 
       content,
-      youtubeUrl, 
-      youtubeVideoId,
+      videoUrl,
       relatedFiles = [],  
       courseId 
     } = req.body;
@@ -418,8 +417,7 @@ export const createLecture = async (req, res) => {
       title, 
       description, 
       content,
-      youtubeUrl, 
-      youtubeVideoId,
+      videoUrl,
       relatedFiles: cleanedRelatedFiles,
       createdBy
     });
@@ -478,8 +476,7 @@ export const updateLecture = async (req, res) => {
       title, 
       description, 
       content,
-      youtubeUrl, 
-      videoFile,
+      videoUrl,
       relatedFiles 
     } = req.body;
     
@@ -519,8 +516,7 @@ export const updateLecture = async (req, res) => {
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (content !== undefined) updateData.content = content;
-    if (youtubeUrl !== undefined) updateData.youtubeUrl = youtubeUrl;
-    if (youtubeVideoId !== undefined) updateData.youtubeVideoId = youtubeVideoId;
+    if (videoUrl !== undefined) updateData.videoUrl = videoUrl;
     // Always update relatedFiles if it's provided (even if empty array)
     if (relatedFiles !== undefined) {
       console.log('Updating relatedFiles with:', cleanedRelatedFiles);
@@ -588,63 +584,3 @@ export const completeLecture = async (req, res) => {
 };
 
 // Save YouTube video URL to a lecture
-export const saveYouTubeVideo = async (req, res) => {
-  try {
-    const { lectureId } = req.params;
-    const { youtubeUrl, title, description, videoId } = req.body;
-    
-    if (!youtubeUrl) {
-      return res.status(400).json({ message: 'YouTube URL is required' });
-    }
-    
-    const lecture = await Lecture.findById(lectureId);
-    if (!lecture) {
-      return res.status(404).json({ message: 'Lecture not found' });
-    }
-    
-    // Update lecture with YouTube video information
-    lecture.youtubeUrl = youtubeUrl;
-    if (videoId) {
-      lecture.youtubeVideoId = videoId;
-    } else {
-      // Extract video ID from URL if not provided
-      const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-        /youtube\.com\/v\/([^&\n?#]+)/,
-        /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-      ];
-      
-      for (const pattern of patterns) {
-        const match = youtubeUrl.match(pattern);
-        if (match) {
-          lecture.youtubeVideoId = match[1];
-          break;
-        }
-      }
-    }
-    
-    // Update title and description if provided
-    if (title) {
-      lecture.title = title;
-    }
-    if (description) {
-      lecture.description = description;
-    }
-    
-    await lecture.save();
-    
-    res.json({ 
-      message: 'YouTube video saved successfully',
-      lecture: {
-        _id: lecture._id,
-        title: lecture.title,
-        description: lecture.description,
-        youtubeUrl: lecture.youtubeUrl,
-        youtubeVideoId: lecture.youtubeVideoId
-      }
-    });
-  } catch (error) {
-    console.error('Error saving YouTube video:', error);
-    res.status(500).json({ message: 'Failed to save YouTube video', error: error.message });
-  }
-};

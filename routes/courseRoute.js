@@ -16,7 +16,6 @@ import {
   updateLecture,
   deleteLecture,
   completeLecture,
-  saveYouTubeVideo,
 } from '../controllers/courseController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -43,6 +42,5 @@ router.post('/lectures', protect, authorize('admin'), createLecture); // Create 
 router.put('/lectures/:id', protect, authorize('admin'), updateLecture); // Update a lecture
 router.delete('/lectures/:id', protect, authorize('admin'), deleteLecture); // Delete a lecture
 router.post('/lectures/:id/complete', protect, completeLecture); // Mark a lecture as completed
-router.post('/lectures/:lectureId/youtube', protect, authorize('admin'), saveYouTubeVideo); // Save a YouTube video URL to a lecture
 
 export default router;
