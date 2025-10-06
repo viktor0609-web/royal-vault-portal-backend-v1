@@ -146,35 +146,61 @@ export const logoutUser = async (req, res) => {
   res.json({ message: 'Logged out successfully' });
 };
 
-// Profile
+// Basic user profile (MongoDB only) - for AuthContext and other components
+export const getUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password -refreshToken');
+    res.json(user);
+  } catch (e) {
+    console.log("Get user error:", e);
+    res.status(500).json({ message: e.message });
+  }
+};
+
+// Detailed profile with HubSpot data - for Profile page only
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -refreshToken');
     console.log(user);
     
-
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
 
-    // Request specific properties (like phone, firstname, lastname)
+    // Request additional properties from HubSpot that might be useful for profile display
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
-    )}?idProperty=email&properties=firstname,lastname,email,phone`;
+    )}?idProperty=email&properties=firstname,lastname,email,phone,company,country,state,city,zip,address,lifecyclestage,hs_lead_status,createdate,lastmodifieddate,website,industry,jobtitle,annualrevenue,numberofemployees`;
     
-    const response = await axios.get(HUBSPOT_API_URL, {
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    });
-    
-    const contact = response.data;
-    
-    console.log("Contact:", contact);
-    
-    
+    try {
+      const response = await axios.get(HUBSPOT_API_URL, {
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      const contact = response.data;
+      console.log("HubSpot Contact:", contact);
+      
+      // Merge user data with HubSpot properties, prioritizing HubSpot data
+      const profileData = {
+        ...user.toObject(),
+        ...contact.properties,
+        // Ensure we have the user ID and other essential fields
+        _id: user._id,
+        role: user.role,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      };
 
-    res.json({...user, ...contact.properties});
+      res.json(profileData);
+    } catch (hubspotError) {
+      console.log("HubSpot API error:", hubspotError.response?.data || hubspotError.message);
+      // If HubSpot fails, return just the user data
+      res.json(user);
+    }
   } catch (e) {
+    console.log("Profile error:", e);
     res.status(500).json({ message: e.message });
   }
 };
