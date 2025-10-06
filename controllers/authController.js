@@ -51,12 +51,12 @@ export const registerUser = async (req, res) => {
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
 
     // Send POST request to HubSpot API
-    // await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-    //   headers: {
-    //     Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-    //     "Content-Type": "application/json",
-    //   },
-    // });
+    await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+      headers: {
+        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
 
     // Send the verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
