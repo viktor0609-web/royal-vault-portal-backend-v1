@@ -20,8 +20,8 @@ const generateRefreshToken = (id, role) =>
 // Register user & create HubSpot contact
 export const registerUser = async (req, res) => {
   try {
-    const { username, email, phone, role } = req.body;
-    if (!username || !email || !phone) {
+    const { username, firstName, lastName, email, phone, role } = req.body;
+    if (!username || !firstName || !lastName || !email || !phone) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
@@ -31,7 +31,8 @@ export const registerUser = async (req, res) => {
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
     const user = await User.create({
-      username,
+      firstName,
+      lastName,
       email,
       phone,
       password: 123456,
@@ -43,7 +44,8 @@ export const registerUser = async (req, res) => {
     const hubSpotContact = {
       properties: {
         email: user.email,
-        firstname: user.username, // You can adjust this as needed (e.g., full name)
+        firstname: user.firstName,
+        lastname: user.lastName,
         phone: user.phone,
       },
     };
@@ -148,7 +150,30 @@ export const logoutUser = async (req, res) => {
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -refreshToken');
-    res.json(user);
+    console.log(user);
+    
+
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+
+    // Request specific properties (like phone, firstname, lastname)
+    const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
+      user.email
+    )}?idProperty=email&properties=firstname,lastname,email,phone`;
+    
+    const response = await axios.get(HUBSPOT_API_URL, {
+      headers: {
+        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    const contact = response.data;
+    
+    console.log("Contact:", contact);
+    
+    
+
+    res.json({...user, ...contact.properties});
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
