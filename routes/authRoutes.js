@@ -5,6 +5,7 @@ import {
   loginUser,
   refreshAccessToken,
   logoutUser,
+  getUser,
   getProfile,
   forgotPassword,
   resetPassword,
@@ -22,7 +23,8 @@ router.post('/logout', logoutUser);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 
-router.get('/profile', protect, getProfile);
+router.get('/user', protect, getUser); // MongoDB only - for AuthContext
+router.get('/profile', protect, getProfile); // HubSpot + MongoDB - for Profile page
 router.get('/admin', protect, authorize('admin'), (req, res) => {
   res.json({ message: 'Welcome Admin! You have special access.' });
 });
