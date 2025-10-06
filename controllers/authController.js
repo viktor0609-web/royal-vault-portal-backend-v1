@@ -20,12 +20,12 @@ const generateRefreshToken = (id, role) =>
 // Register user & create HubSpot contact
 export const registerUser = async (req, res) => {
   try {
-    const { username, firstName, lastName, email, phone, role } = req.body;
-    if (!username || !firstName || !lastName || !email || !phone) {
+    const {firstName, lastName, email, phone, role } = req.body;
+    if (!firstName || !lastName || !email || !phone) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    const existing = await User.findOne({ $or: [{ email }] });
     if (existing) return res.status(400).json({ message: 'User already exists' });
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -50,21 +50,21 @@ export const registerUser = async (req, res) => {
       },
     };
 
-    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
+    // const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
 
-    // Send POST request to HubSpot API
-    await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // // Send POST request to HubSpot API
+    // await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+    //   headers: {
+    //     Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+    //     "Content-Type": "application/json",
+    //   },
+    // });
 
     // Send the verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
 
     const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
-    await sendEmail(email, username, verificationUrl, templateId);
+    await sendEmail(email, firstName + lastName, verificationUrl, templateId);
 
     res.status(201).json({ message: 'Registered. Please verify your email.' });
   } catch (e) {
@@ -220,7 +220,7 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
     const templateId = process.env.PASSWORD_RESET_TEMPLATE_ID;
-    await sendEmail(email, user.username, resetUrl, templateId);
+    await sendEmail(email, user.firstName + user.lastName, resetUrl, templateId);
 
     res.json({ message: 'Password reset email sent.' });
   } catch (e) {
