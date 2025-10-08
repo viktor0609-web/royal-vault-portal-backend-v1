@@ -174,7 +174,40 @@ export const logoutUser = async (req, res) => {
 export const getUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -refreshToken');
-    res.json(user);
+
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+
+    // Request additional properties from HubSpot that might be useful for profile display
+    const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
+      user.email
+    )}?idProperty=email&properties=elite_client`;
+    
+    try {
+      const response = await axios.get(HUBSPOT_API_URL, {
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const contact = response.data;
+      console.log("HubSpot Contact:", contact);
+      
+      // Merge user data with HubSpot properties, prioritizing HubSpot data
+      const profileData = {
+        ...user.toObject(),
+        ...contact.properties,
+      };
+      console.log("Profile Data:", profileData);
+      res.json(profileData);
+    }
+    catch(hubspotError){
+
+      console.log("HubSpot API error:", hubspotError.response?.data || hubspotError.message);
+      // If HubSpot fails, return just the user data
+      res.json(user);
+    }
+
   } catch (e) {
     console.log("Get user error:", e);
     res.status(500).json({ message: e.message });
@@ -192,7 +225,7 @@ export const getProfile = async (req, res) => {
     // Request additional properties from HubSpot that might be useful for profile display
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
-    )}?idProperty=email&properties=firstname,lastname,email,phone,company,country,state,city,zip,address,lifecyclestage,hs_lead_status,createdate,lastmodifieddate,website,industry,jobtitle,annualrevenue,numberofemployees`;
+    )}?idProperty=email&properties=firstname,lastname,email,phone,company,country,state,city,zip,address,lifecyclestage,hs_lead_status,createdate,lastmodifieddate,website,industry,jobtitle,annualrevenue,numberofemployees,elite_client`;
     
     try {
       const response = await axios.get(HUBSPOT_API_URL, {
