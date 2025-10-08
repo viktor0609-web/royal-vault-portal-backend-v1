@@ -66,7 +66,19 @@ export const registerUser = async (req, res) => {
     const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
     await sendEmail(email, firstName + lastName, verificationUrl, templateId);
 
-    res.status(201).json({ message: 'Registered. Please verify your email.' });
+    // Generate tokens for immediate login
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id, user.role);
+    
+    // Save refresh token
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.status(201).json({ 
+      message: 'Registered successfully. You are now logged in.', 
+      accessToken, 
+      refreshToken 
+    });
   } catch (e) {
     console.log(e);
     res.status(500).json({ message: e.message });
@@ -83,8 +95,20 @@ export const verifyEmail = async (req, res) => {
     user.isVerified = true;
     user.verificationToken = null;
     user.password = await bcrypt.hash(password, 10);
+    
+    // Generate tokens for immediate login
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id, user.role);
+    
+    // Save refresh token
+    user.refreshToken = refreshToken;
     await user.save();
-    res.json({ message: 'Email verified successfully.' });
+    
+    res.json({ 
+      message: 'Email verified successfully. You are now logged in.', 
+      accessToken, 
+      refreshToken 
+    });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -242,9 +266,20 @@ export const resetPassword = async (req, res) => {
     user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = null;
     user.resetPasswordExpire = null;
+    
+    // Generate tokens for immediate login
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id, user.role);
+    
+    // Save refresh token
+    user.refreshToken = refreshToken;
     await user.save();
 
-    res.json({ message: 'Password reset successful.' });
+    res.json({ 
+      message: 'Password reset successful. You are now logged in.', 
+      accessToken, 
+      refreshToken 
+    });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
