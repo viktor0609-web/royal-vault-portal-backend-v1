@@ -9,6 +9,7 @@ import {
   getProfile,
   forgotPassword,
   resetPassword,
+  updateProfile,
 } from '../controllers/authController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -25,6 +26,7 @@ router.post('/reset-password/:token', resetPassword);
 
 router.get('/user', protect, getUser); // MongoDB only - for AuthContext
 router.get('/profile', protect, getProfile); // HubSpot + MongoDB - for Profile page
+router.put('/profile', protect, updateProfile); // Update user profile
 router.get('/admin', protect, authorize('admin'), (req, res) => {
   res.json({ message: 'Welcome Admin! You have special access.' });
 });
