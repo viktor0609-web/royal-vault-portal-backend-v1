@@ -6,11 +6,11 @@ import Webinar from '../models/Webinar.js';
 export const getAllWebinars = async (req, res) => {
   try {
     const { fields = 'full', status, streamType } = req.query;
-    
+
     let selectFields = '';
     let populateFields = [];
     let query = {};
-    
+
     // Add filters
     if (status) {
       query.status = status;
@@ -18,7 +18,7 @@ export const getAllWebinars = async (req, res) => {
     if (streamType) {
       query.streamType = streamType;
     }
-    
+
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay createdAt';
     } else if (fields === 'detailed') {
@@ -33,18 +33,18 @@ export const getAllWebinars = async (req, res) => {
         { path: 'createdBy', select: 'name email' }
       ];
     }
-    
+
     const webinars = await Webinar.find(query)
       .select(selectFields)
       .populate(populateFields)
       .sort({ createdAt: -1 })
       .lean();
 
-      console.log("webinars:", webinars);
-      
-    
-    res.status(200).json({ 
-      message: 'Webinars fetched successfully', 
+    console.log("webinars:", webinars);
+
+
+    res.status(200).json({
+      message: 'Webinars fetched successfully',
       webinars,
       count: webinars.length
     });
@@ -59,10 +59,10 @@ export const getWebinarById = async (req, res) => {
   try {
     const { webinarId } = req.params;
     const { fields = 'full' } = req.query;
-    
+
     let selectFields = '';
     let populateFields = [];
-    
+
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay';
     } else {
@@ -71,15 +71,15 @@ export const getWebinarById = async (req, res) => {
         { path: 'createdBy', select: 'name email' }
       ];
     }
-    
+
     const webinar = await Webinar.findById(webinarId)
       .select(selectFields)
       .populate(populateFields);
-    
+
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
-    
+
     res.status(200).json({ message: 'Webinar fetched successfully', webinar });
   } catch (error) {
     console.error(error);
@@ -119,6 +119,24 @@ export const createWebinar = async (req, res) => {
       return res.status(400).json({ message: 'Slug already exists' });
     }
 
+    // try {
+    //   const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/lists/${LIST_ID}`;
+    //   // Make the API request for a specific list
+    //   const response = await axios.get(HUBSPOT_API_URL, {
+    //     params: {
+    //       hapikey: API_KEY
+    //     }
+    //   });
+    //   // Log the details of the list
+    //   const list = response.data;
+    //   console.log(`List ID: ${list.id}, Name: ${list.properties.name}`);
+
+    // } catch (error) {
+    //   console.error('Error fetching the list:', error.response ? error.response.data : error.message);
+    // }
+
+
+
     const newWebinar = new Webinar({
       streamType,
       name,
@@ -142,15 +160,15 @@ export const createWebinar = async (req, res) => {
     });
 
     await newWebinar.save();
-    
+
     // Populate the response
     const populatedWebinar = await Webinar.findById(newWebinar._id)
       .populate('proSmsList', 'name')
       .populate('createdBy', 'name email');
 
-    res.status(201).json({ 
-      message: 'Webinar created successfully', 
-      webinar: populatedWebinar 
+    res.status(201).json({
+      message: 'Webinar created successfully',
+      webinar: populatedWebinar
     });
   } catch (error) {
     console.error(error);
@@ -185,9 +203,9 @@ export const updateWebinar = async (req, res) => {
 
     // Check if slug already exists (excluding current webinar)
     if (slug) {
-      const existingWebinar = await Webinar.findOne({ 
-        slug, 
-        _id: { $ne: webinarId } 
+      const existingWebinar = await Webinar.findOne({
+        slug,
+        _id: { $ne: webinarId }
       });
       if (existingWebinar) {
         return res.status(400).json({ message: 'Slug already exists' });
@@ -227,16 +245,16 @@ export const updateWebinar = async (req, res) => {
       updateData,
       { new: true, runValidators: true }
     )
-    .populate('proSmsList', 'name')
-    .populate('createdBy', 'name email');
-    
+      .populate('proSmsList', 'name')
+      .populate('createdBy', 'name email');
+
     if (!updatedWebinar) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
-    
-    res.status(200).json({ 
-      message: 'Webinar updated successfully', 
-      webinar: updatedWebinar 
+
+    res.status(200).json({
+      message: 'Webinar updated successfully',
+      webinar: updatedWebinar
     });
   } catch (error) {
     console.error(error);
@@ -250,11 +268,11 @@ export const deleteWebinar = async (req, res) => {
     const { webinarId } = req.params;
 
     const deletedWebinar = await Webinar.findByIdAndDelete(webinarId);
-    
+
     if (!deletedWebinar) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
-    
+
     res.status(200).json({ message: 'Webinar deleted successfully' });
   } catch (error) {
     console.error(error);
@@ -273,9 +291,9 @@ export const viewAttendees = async (req, res) => {
       return res.status(404).json({ message: 'Webinar not found' });
     }
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Attendees fetched successfully',
-      attendees: webinar.attendees 
+      attendees: webinar.attendees
     });
   } catch (error) {
     console.error(error);
@@ -343,11 +361,11 @@ export const adminMarkAsMissed = async (req, res) => {
 export const getPublicWebinars = async (req, res) => {
   try {
     const { fields = 'basic', status, streamType } = req.query;
-    
+
     let selectFields = '';
     let populateFields = [];
     let query = { portalDisplay: 'Yes' }; // Only show webinars that are set to display
-    
+
     // Add filters
     if (status) {
       query.status = status;
@@ -355,7 +373,7 @@ export const getPublicWebinars = async (req, res) => {
     if (streamType) {
       query.streamType = streamType;
     }
-    
+
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments attendees';
     } else {
@@ -364,15 +382,15 @@ export const getPublicWebinars = async (req, res) => {
         { path: 'createdBy', select: 'name email' }
       ];
     }
-    
+
     const webinars = await Webinar.find(query)
       .select(selectFields)
       .populate(populateFields)
       .sort({ date: 1 })
       .lean();
-    
-    res.status(200).json({ 
-      message: 'Webinars fetched successfully', 
+
+    res.status(200).json({
+      message: 'Webinars fetched successfully',
       webinars,
       count: webinars.length
     });
@@ -386,17 +404,17 @@ export const getPublicWebinars = async (req, res) => {
 export const getPublicWebinarById = async (req, res) => {
   try {
     const { webinarId } = req.params;
-    
-    const webinar = await Webinar.findOne({ 
-      _id: webinarId, 
-      portalDisplay: 'Yes' 
+
+    const webinar = await Webinar.findOne({
+      _id: webinarId,
+      portalDisplay: 'Yes'
     })
-    .populate('createdBy', 'name email');
-    
+      .populate('createdBy', 'name email');
+
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
-    
+
     res.status(200).json({ message: 'Webinar fetched successfully', webinar });
   } catch (error) {
     console.error(error);
