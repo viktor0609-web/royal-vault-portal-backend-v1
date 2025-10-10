@@ -225,7 +225,7 @@ export const getProfile = async (req, res) => {
     // Request additional properties from HubSpot that might be useful for profile display
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
-    )}?idProperty=email&properties=firstname,lastname,email,phone,company,country,state,city,zip,address,lifecyclestage,hs_lead_status,createdate,lastmodifieddate,website,industry,jobtitle,annualrevenue,numberofemployees,elite_client`;
+    )}?idProperty=email&properties=firstname,lastname,email,phone,country,state,city,zip,address,lifecyclestage,elite_client`;
 
     try {
       const response = await axios.get(HUBSPOT_API_URL, {
