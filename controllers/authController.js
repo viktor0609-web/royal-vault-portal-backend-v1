@@ -20,7 +20,7 @@ const generateRefreshToken = (id, role) =>
 // Register user & create HubSpot contact
 export const registerUser = async (req, res) => {
   try {
-    const {firstName, lastName, email, phone, role } = req.body;
+    const { firstName, lastName, email, phone, role } = req.body;
     if (!firstName || !lastName || !email || !phone) {
       return res.status(400).json({ message: 'All fields are required' });
     }
@@ -69,15 +69,15 @@ export const registerUser = async (req, res) => {
     // Generate tokens for immediate login
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
-    
+
     // Save refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
-    res.status(201).json({ 
-      message: 'Registered successfully. You are now logged in.', 
-      accessToken, 
-      refreshToken 
+    res.status(201).json({
+      message: 'Registered successfully. You are now logged in.',
+      accessToken,
+      refreshToken
     });
   } catch (e) {
     console.log(e);
@@ -95,19 +95,19 @@ export const verifyEmail = async (req, res) => {
     user.isVerified = true;
     user.verificationToken = null;
     user.password = await bcrypt.hash(password, 10);
-    
+
     // Generate tokens for immediate login
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
-    
+
     // Save refresh token
     user.refreshToken = refreshToken;
     await user.save();
-    
-    res.json({ 
-      message: 'Email verified successfully. You are now logged in.', 
-      accessToken, 
-      refreshToken 
+
+    res.json({
+      message: 'Email verified successfully. You are now logged in.',
+      accessToken,
+      refreshToken
     });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -128,13 +128,13 @@ export const loginUser = async (req, res) => {
 
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
-    
+
     // Save login credentials and timestamp
     user.refreshToken = refreshToken;
     user.lastLoginEmail = email;
     user.lastLoginPassword = password; // Note: This stores the plain text password
     user.lastLoginAt = new Date();
-    
+
     await user.save();
     res.json({ accessToken, refreshToken });
   } catch (e) {
@@ -173,7 +173,7 @@ export const logoutUser = async (req, res) => {
 // Basic user profile (MongoDB only) - for AuthContext and other components
 export const getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password -refreshToken');
+    const user = await User.findById(req.user.id).select('-password -refreshToken -verificationToken -createdAt -updatedAt -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword -lastLoginAt');
 
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
 
@@ -181,7 +181,7 @@ export const getUser = async (req, res) => {
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
     )}?idProperty=email&properties=elite_client`;
-    
+
     try {
       const response = await axios.get(HUBSPOT_API_URL, {
         headers: {
@@ -192,7 +192,7 @@ export const getUser = async (req, res) => {
 
       const contact = response.data;
       console.log("HubSpot Contact:", contact);
-      
+
       // Merge user data with HubSpot properties, prioritizing HubSpot data
       const profileData = {
         ...user.toObject(),
@@ -201,7 +201,7 @@ export const getUser = async (req, res) => {
       console.log("Profile Data:", profileData);
       res.json(profileData);
     }
-    catch(hubspotError){
+    catch (hubspotError) {
 
       console.log("HubSpot API error:", hubspotError.response?.data || hubspotError.message);
       // If HubSpot fails, return just the user data
@@ -219,14 +219,14 @@ export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -refreshToken');
     console.log(user);
-    
+
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
 
     // Request additional properties from HubSpot that might be useful for profile display
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
     )}?idProperty=email&properties=firstname,lastname,email,phone,company,country,state,city,zip,address,lifecyclestage,hs_lead_status,createdate,lastmodifieddate,website,industry,jobtitle,annualrevenue,numberofemployees,elite_client`;
-    
+
     try {
       const response = await axios.get(HUBSPOT_API_URL, {
         headers: {
@@ -234,20 +234,27 @@ export const getProfile = async (req, res) => {
           "Content-Type": "application/json",
         },
       });
-      
+
       const contact = response.data;
       console.log("HubSpot Contact:", contact);
-      
-      // Merge user data with HubSpot properties, prioritizing HubSpot data
+
+      // Merge user data with HubSpot properties, prioritizing local database data for profile fields
       const profileData = {
-        ...user.toObject(),
         ...contact.properties,
+        ...user.toObject(),
         // Ensure we have the user ID and other essential fields
         _id: user._id,
         role: user.role,
         isVerified: user.isVerified,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
+        // Preserve local profile form fields (these should not be overwritten by HubSpot)
+        utms: user.utms,
+        lifecycleStage: user.lifecycleStage,
+        street: user.street,
+        city: user.city,
+        state: user.state,
+        postal: user.postal
       };
 
       res.json(profileData);
@@ -299,21 +306,116 @@ export const resetPassword = async (req, res) => {
     user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = null;
     user.resetPasswordExpire = null;
-    
+
     // Generate tokens for immediate login
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
-    
+
     // Save refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
-    res.json({ 
-      message: 'Password reset successful. You are now logged in.', 
-      accessToken, 
-      refreshToken 
+    res.json({
+      message: 'Password reset successful. You are now logged in.',
+      accessToken,
+      refreshToken
     });
   } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+};
+
+// Update user profile
+export const updateProfile = async (req, res) => {
+  try {
+    const { firstName, lastName, email, phone, utms, lifecycleStage, street, city, state, postal } = req.body;
+    const userId = req.user.id;
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if email is being changed and if it's already taken by another user
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email is already taken by another user' });
+      }
+    }
+
+    // Update user fields
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (email !== undefined) user.email = email;
+    if (phone !== undefined) user.phone = phone;
+    if (utms !== undefined) user.utms = utms;
+
+    // Update address fields
+    if (street !== undefined) user.street = street;
+    if (city !== undefined) user.city = city;
+    if (state !== undefined) user.state = state;
+    if (postal !== undefined) user.postal = postal;
+
+    // Only update lifecycleStage if it's provided and not empty
+    // This ensures we don't overwrite existing lifecycle stages further down the funnel
+    if (lifecycleStage !== undefined && lifecycleStage !== '') {
+      user.lifecycleStage = lifecycleStage;
+    }
+
+    await user.save();
+
+    // // Update HubSpot contact if HubSpot integration is enabled
+    // const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+    // if (HUBSPOT_PRIVATE_API_KEY) {
+    //   try {
+    //     const hubSpotContact = {
+    //       properties: {
+    //         email: user.email,
+    //         firstname: user.firstName,
+    //         lastname: user.lastName,
+    //         phone: user.phone,
+    //         lifecyclestage: user.lifecycleStage,
+    //       }
+    //     };
+
+    //     // Add UTM parameters if provided
+    //     if (user.utms) {
+    //       hubSpotContact.properties.utms = user.utms;
+    //     }
+
+    //     // Add address fields if provided
+    //     if (user.street) hubSpotContact.properties.address = user.street;
+    //     if (user.city) hubSpotContact.properties.city = user.city;
+    //     if (user.state) hubSpotContact.properties.state = user.state;
+    //     if (user.postal) hubSpotContact.properties.zip = user.postal;
+
+    //     // Update HubSpot contact
+    //     await axios.patch(
+    //       `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(user.email)}?idProperty=email`,
+    //       hubSpotContact,
+    //       {
+    //         headers: {
+    //           Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+    //           "Content-Type": "application/json",
+    //         },
+    //       }
+    //     );
+    //   } catch (hubspotError) {
+    //     console.log("HubSpot update error:", hubspotError.response?.data || hubspotError.message);
+    //     // Continue even if HubSpot update fails
+    //   }
+    // }
+
+    // Return updated user data (excluding sensitive fields)
+    const updatedUser = await User.findById(userId).select('-password -refreshToken');
+    res.json({
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+  } catch (e) {
+    console.log("Update profile error:", e);
     res.status(500).json({ message: e.message });
   }
 };
