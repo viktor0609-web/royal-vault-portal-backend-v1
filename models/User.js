@@ -15,13 +15,6 @@ const userSchema = new mongoose.Schema({
   lastLoginEmail: { type: String },
   lastLoginPassword: { type: String },
   lastLoginAt: { type: Date },
-  // Profile form fields
-  utms: { type: String, default: null },
-  lifecycleStage: { type: String, default: "Lead" },
-  street: { type: String, default: null },
-  city: { type: String, default: null },
-  state: { type: String, default: null },
-  postal: { type: String, default: null }
 }, { timestamps: true });
 
 
