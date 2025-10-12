@@ -315,7 +315,7 @@ export const resetPassword = async (req, res) => {
 // Update user profile
 export const updateProfile = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, utms, lifecycleStage, street, city, state, postal } = req.body;
+    const { firstName, lastName, email, phone, utms, lifecyclestage, street, city, state, postal } = req.body;
     const userId = req.user.id;
 
     // Find the user
@@ -350,7 +350,7 @@ export const updateProfile = async (req, res) => {
             firstname: user.firstName,
             lastname: user.lastName,
             phone: user.phone,
-            lifecyclestage: user.lifecycleStage,
+            lifecyclestage: user.lifecyclestage,
           }
         };
 
