@@ -173,14 +173,14 @@ export const logoutUser = async (req, res) => {
 // Basic user profile (MongoDB only) - for AuthContext and other components
 export const getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password -refreshToken -verificationToken -createdAt -updatedAt -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword -lastLoginAt');
+    const user = await User.findById(req.user.id).select('-password -refreshToken -verificationToken -updatedAt -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword -lastLoginAt');
 
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
 
     // Request additional properties from HubSpot that might be useful for profile display
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
-    )}?idProperty=email&properties=elite_client`;
+    )}?idProperty=email&properties=client_type`;
 
     try {
       const response = await axios.get(HUBSPOT_API_URL, {
@@ -217,7 +217,7 @@ export const getUser = async (req, res) => {
 // Detailed profile with HubSpot data - for Profile page only
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password -refreshToken');
+    const user = await User.findById(req.user.id).select('-password -refreshToken -createdAt -updatedAt -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword -lastLoginAt -verificationToken');
     console.log(user);
 
     const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
@@ -225,7 +225,7 @@ export const getProfile = async (req, res) => {
     // Request additional properties from HubSpot that might be useful for profile display
     const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
       user.email
-    )}?idProperty=email&properties=firstname,lastname,email,phone,country,state,city,zip,address,lifecyclestage,elite_client`;
+    )}?idProperty=email&properties=firstname,lastname,email,phone,country,state,city,zip,address,lifecyclestage,client_type`;
 
     try {
       const response = await axios.get(HUBSPOT_API_URL, {
@@ -241,20 +241,7 @@ export const getProfile = async (req, res) => {
       // Merge user data with HubSpot properties, prioritizing local database data for profile fields
       const profileData = {
         ...contact.properties,
-        ...user.toObject(),
-        // Ensure we have the user ID and other essential fields
-        _id: user._id,
-        role: user.role,
-        isVerified: user.isVerified,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        // Preserve local profile form fields (these should not be overwritten by HubSpot)
-        utms: user.utms,
-        lifecycleStage: user.lifecycleStage,
-        street: user.street,
-        city: user.city,
-        state: user.state,
-        postal: user.postal
+        ...user.toObject()
       };
 
       res.json(profileData);
