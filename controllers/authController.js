@@ -240,8 +240,8 @@ export const getProfile = async (req, res) => {
 
       // Merge user data with HubSpot properties, prioritizing local database data for profile fields
       const profileData = {
-        ...contact.properties,
-        ...user.toObject()
+        ...user.toObject(),
+        ...contact.properties
       };
 
       res.json(profileData);
