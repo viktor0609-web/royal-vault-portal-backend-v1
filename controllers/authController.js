@@ -337,70 +337,87 @@ export const updateProfile = async (req, res) => {
     if (lastName !== undefined) user.lastName = lastName;
     if (email !== undefined) user.email = email;
     if (phone !== undefined) user.phone = phone;
-    if (utms !== undefined) user.utms = utms;
-
-    // Update address fields
-    if (street !== undefined) user.street = street;
-    if (city !== undefined) user.city = city;
-    if (state !== undefined) user.state = state;
-    if (postal !== undefined) user.postal = postal;
-
-    // Only update lifecycleStage if it's provided and not empty
-    // This ensures we don't overwrite existing lifecycle stages further down the funnel
-    if (lifecycleStage !== undefined && lifecycleStage !== '') {
-      user.lifecycleStage = lifecycleStage;
-    }
 
     await user.save();
 
     // // Update HubSpot contact if HubSpot integration is enabled
-    // const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
-    // if (HUBSPOT_PRIVATE_API_KEY) {
-    //   try {
-    //     const hubSpotContact = {
-    //       properties: {
-    //         email: user.email,
-    //         firstname: user.firstName,
-    //         lastname: user.lastName,
-    //         phone: user.phone,
-    //         lifecyclestage: user.lifecycleStage,
-    //       }
-    //     };
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+    if (HUBSPOT_PRIVATE_API_KEY) {
+      try {
+        const hubSpotContact = {
+          properties: {
+            email: user.email,
+            firstname: user.firstName,
+            lastname: user.lastName,
+            phone: user.phone,
+            lifecyclestage: user.lifecycleStage,
+          }
+        };
 
-    //     // Add UTM parameters if provided
-    //     if (user.utms) {
-    //       hubSpotContact.properties.utms = user.utms;
-    //     }
+        // Add UTM parameters if provided
+        if (user.utms) {
+          hubSpotContact.properties.utms = user.utms;
+        }
 
-    //     // Add address fields if provided
-    //     if (user.street) hubSpotContact.properties.address = user.street;
-    //     if (user.city) hubSpotContact.properties.city = user.city;
-    //     if (user.state) hubSpotContact.properties.state = user.state;
-    //     if (user.postal) hubSpotContact.properties.zip = user.postal;
+        // Add address fields if provided
+        if (user.street) hubSpotContact.properties.address = street;
+        if (user.city) hubSpotContact.properties.city = city;
+        if (user.state) hubSpotContact.properties.state = state;
+        if (user.postal) hubSpotContact.properties.zip = postal;
 
-    //     // Update HubSpot contact
-    //     await axios.patch(
-    //       `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(user.email)}?idProperty=email`,
-    //       hubSpotContact,
-    //       {
-    //         headers: {
-    //           Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-    //           "Content-Type": "application/json",
-    //         },
-    //       }
-    //     );
-    //   } catch (hubspotError) {
-    //     console.log("HubSpot update error:", hubspotError.response?.data || hubspotError.message);
-    //     // Continue even if HubSpot update fails
-    //   }
-    // }
+        // Update HubSpot contact
+        await axios.patch(
+          `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(user.email)}?idProperty=email`,
+          hubSpotContact,
+          {
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      } catch (hubspotError) {
+        console.log("HubSpot update error:", hubspotError.response?.data || hubspotError.message);
+        // Continue even if HubSpot update fails
+      }
+    }
 
     // Return updated user data (excluding sensitive fields)
-    const updatedUser = await User.findById(userId).select('-password -refreshToken');
-    res.json({
-      message: 'Profile updated successfully',
-      user: updatedUser
-    });
+    const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(
+      user.email
+    )}?idProperty=email&properties=firstname,lastname,email,phone,country,state,city,zip,address,lifecyclestage,client_type`;
+
+    try {
+      const response = await axios.get(HUBSPOT_API_URL, {
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const contact = response.data;
+
+      console.log("HubSpot Contact:", contact);
+
+      console.log("updated User", user);
+
+
+      // Merge user data with HubSpot properties, prioritizing local database data for profile fields
+      const profileData = {
+        ...user.toObject(),
+        ...contact.properties
+      };
+
+      res.json({
+        message: 'Profile updated successfully',
+        user: profileData
+      });
+    } catch (hubspotError) {
+      console.log("HubSpot API error:", hubspotError.response?.data || hubspotError.message);
+      // If HubSpot fails, return just the user data
+      res.json(user);
+    }
+
   } catch (e) {
     console.log("Update profile error:", e);
     res.status(500).json({ message: e.message });
