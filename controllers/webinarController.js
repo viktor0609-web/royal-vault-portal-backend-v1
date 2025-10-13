@@ -119,23 +119,6 @@ export const createWebinar = async (req, res) => {
       return res.status(400).json({ message: 'Slug already exists' });
     }
 
-    // try {
-    //   const HUBSPOT_API_URL = `https://api.hubapi.com/crm/v3/objects/lists/${LIST_ID}`;
-    //   // Make the API request for a specific list
-    //   const response = await axios.get(HUBSPOT_API_URL, {
-    //     params: {
-    //       hapikey: API_KEY
-    //     }
-    //   });
-    //   // Log the details of the list
-    //   const list = response.data;
-    //   console.log(`List ID: ${list.id}, Name: ${list.properties.name}`);
-
-    // } catch (error) {
-    //   console.error('Error fetching the list:', error.response ? error.response.data : error.message);
-    // }
-
-
 
     const newWebinar = new Webinar({
       streamType,
