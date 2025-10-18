@@ -31,9 +31,6 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static('uploads'));
-
 // Test route
 app.get('/', (req, res) => {
   res.send("RLS's client portal API is running");
@@ -44,19 +41,19 @@ app.use('/api', routes);
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
+  res.status(404).json({
+    success: false,
     message: 'API endpoint not found',
-    path: req.originalUrl 
+    path: req.originalUrl
   });
 });
 
 // 404 handler for all other routes
 app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
+  res.status(404).json({
+    success: false,
     message: 'Route not found',
-    path: req.originalUrl 
+    path: req.originalUrl
   });
 });
 
