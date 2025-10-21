@@ -1,3 +1,4 @@
+import User from '../models/User.js';
 import Webinar from '../models/Webinar.js';
 
 // ==================== ADMIN FUNCTIONS ====================
@@ -502,3 +503,16 @@ export const unregisterFromWebinar = async (req, res) => {
     res.status(500).json({ message: 'Error unregistering from the webinar' });
   }
 };
+
+export const isValidEmailAddress = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const exist = await User.findOne({ email });
+
+    res.status(200).json({ message: 'Email address is Exist', exist: exist ? true : false });
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error' });
+  }
+}
