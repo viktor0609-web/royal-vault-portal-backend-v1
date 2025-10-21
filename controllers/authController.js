@@ -2,12 +2,10 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import Hubspot from '@hubspot/api-client';
 import axios from 'axios';
 import sendEmail from '../utils/sendEmail.js';
+import mongoose from 'mongoose';
 
-// Base HubSpot API URL
-const HUBSPOT_API_URL = 'https://api.hubapi.com/crm/v3/objects/contacts';
 // Generate JWT tokens
 const generateAccessToken = (id, role) =>
   jwt.sign({ id, role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
@@ -19,28 +17,46 @@ const generateRefreshToken = (id, role) =>
 
 // Register user & create HubSpot contact
 export const registerUser = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { firstName, lastName, email, phone, role } = req.body;
     if (!firstName || !lastName || !email || !phone) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    const existing = await User.findOne({ $or: [{ email }] });
-    if (existing) return res.status(400).json({ message: 'User already exists' });
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
+    const hashedPassword = await bcrypt.hash('123456', 10);
 
-    const user = await User.create({
-      firstName,
-      lastName,
-      email,
-      phone,
-      password: 123456,
-      role: role || 'user',
-      verificationToken,
-    });
+    // Create user inside transaction
+    const [user] = await User.create(
+      [
+        {
+          firstName,
+          lastName,
+          email,
+          phone,
+          password: hashedPassword,
+          role: role || 'user',
+          verificationToken,
+        },
+      ],
+      { session }
+    );
 
-    // Create HubSpot contact
+    // === Create HubSpot contact ===
+    const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+
+
+    console.log(HUBSPOT_API_URL);
+
     const hubSpotContact = {
       properties: {
         email: user.email,
@@ -50,38 +66,56 @@ export const registerUser = async (req, res) => {
       },
     };
 
-    // const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY; // Ensure this is in your .env file
+    await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+      headers: {
+        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    // // Send POST request to HubSpot API
-    // await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-    //   headers: {
-    //     Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-    //     "Content-Type": "application/json",
-    //   },
-    // });
-
-    // Send the verification email
+    // === Send verification email ===
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
-
     const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
-    await sendEmail(email, firstName + lastName, verificationUrl, templateId);
+    await sendEmail(user.email, `${user.firstName} ${user.lastName}`, verificationUrl, templateId);
 
-    // Generate tokens for immediate login
-    const accessToken = generateAccessToken(user.id, user.role);
-    const refreshToken = generateRefreshToken(user.id, user.role);
+    // === Generate JWT tokens ===
+    const accessToken = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: '15m' }
+    );
 
-    // Save refresh token
+    const refreshToken = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.REFRESH_TOKEN_SECRET,
+      { expiresIn: '7d' }
+    );
+
     user.refreshToken = refreshToken;
-    await user.save();
+    await user.save({ session });
+
+    // ✅ Commit transaction only after all success
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(201).json({
       message: 'Registered successfully. You are now logged in.',
       accessToken,
-      refreshToken
+      refreshToken,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({ message: e.message });
+    // ❌ Rollback DB changes if any error occurs
+    await session.abortTransaction();
+    session.endSession();
+
+    console.log(e)
+    console.error('Registration error:', e.message);
+    if (e.status == 409) {
+      res.status(500).json({ message: "You are already registered in our system" });
+    }
+    else {
+      res.status(500).json({ message: e.message });
+    }
   }
 };
 
@@ -292,6 +326,8 @@ export const resetPassword = async (req, res) => {
 
     user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = null;
+    user.isVerified = true;
+    user.verificationToken = null;
     user.resetPasswordExpire = null;
 
     // Generate tokens for immediate login
