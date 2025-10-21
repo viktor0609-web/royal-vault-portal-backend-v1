@@ -15,7 +15,8 @@ import {
   getPublicWebinarById,
   registerForWebinar,
   markAsAttended,
-  unregisterFromWebinar
+  unregisterFromWebinar,
+  isValidEmailAddress
 } from '../controllers/webinarController.js';
 
 const router = express.Router();
@@ -23,6 +24,7 @@ const router = express.Router();
 // ==================== PUBLIC ROUTES ====================
 router.get('/public', getPublicWebinars); // Get all public webinars
 router.get('/public/:webinarId', getPublicWebinarById); // Get public webinar by ID
+router.post('/isValidEmailAddress', isValidEmailAddress);
 
 // ==================== USER ROUTES ====================
 router.post('/:webinarId/register', protect, registerForWebinar); // Register user for a webinar
