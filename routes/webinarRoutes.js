@@ -31,7 +31,7 @@ router.delete('/:webinarId/unregister', protect, unregisterFromWebinar); // Unre
 
 // ==================== ADMIN ROUTES ====================
 router.get('/admin', protect, authorize('admin'), getAllWebinars); // Get all webinars for admin
-router.get('/user/:webinarId', protect, getWebinarById); // Get webinar by ID for admin
+router.get('/user/:webinarId', getWebinarById); // Get webinar by ID for admin
 router.post('/admin', protect, authorize('admin'), createWebinar); // Create a new webinar
 router.put('/admin/:webinarId', protect, authorize('admin'), updateWebinar); // Update an existing webinar
 router.delete('/admin/:webinarId', protect, authorize('admin'), deleteWebinar); // Delete a webinar
