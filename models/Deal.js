@@ -2,6 +2,16 @@ import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
+/**
+ * Deal Schema
+ * 
+ * Date Handling Strategy:
+ * - MongoDB stores ALL dates in UTC automatically (via timestamps: true)
+ * - createdAt and updatedAt are automatically managed by Mongoose
+ * - Frontend should convert to user's local timezone for display using:
+ *   new Date(dateString).toLocaleDateString() or .toLocaleString()
+ * - NEVER manually convert dates before saving to MongoDB - let MongoDB handle UTC storage
+ */
 const dealSchema = new Schema(
   {
     name: {

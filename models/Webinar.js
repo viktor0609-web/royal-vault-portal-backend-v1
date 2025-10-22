@@ -1,7 +1,17 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// Clean Webinar Schema with only necessary fields
+/**
+ * Webinar Schema
+ * 
+ * Date Handling Strategy:
+ * - MongoDB stores ALL dates in UTC automatically
+ * - Fields like 'date', 'registeredAt', 'createdAt', 'updatedAt' are stored in UTC
+ * - Frontend must convert to user's local timezone for display using:
+ *   new Date(dateString).toLocaleDateString() or .toLocaleString()
+ * - NEVER manually convert dates before saving to MongoDB - let MongoDB handle UTC storage
+ * - When receiving dates from frontend forms, ensure they're properly converted to UTC before saving
+ */
 const webinarSchema = new Schema({
   // Core webinar fields
   streamType: {
@@ -24,7 +34,7 @@ const webinarSchema = new Schema({
     type: Date,
     required: true,
   },
-  
+
   // Line fields (Line1 is required, Line2 and Line3 are optional)
   line1: {
     type: String,
@@ -39,7 +49,7 @@ const webinarSchema = new Schema({
     type: String,
     trim: true,
   },
-  
+
   // Status and display settings
   status: {
     type: String,
@@ -59,7 +69,7 @@ const webinarSchema = new Schema({
     required: true,
     default: 'Yes',
   },
-  
+
   // Optional fields
   calInvDesc: {
     type: String,
@@ -94,7 +104,7 @@ const webinarSchema = new Schema({
     type: String,
     trim: true,
   },
-  
+
   // Registration and attendance tracking
   attendees: [{
     user: {
@@ -112,7 +122,7 @@ const webinarSchema = new Schema({
       default: Date.now,
     },
   }],
-  
+
   // Creator tracking
   createdBy: {
     type: Schema.Types.ObjectId,
