@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import Webinar from '../models/Webinar.js';
+import mongoose from 'mongoose';
 
 // ==================== ADMIN FUNCTIONS ====================
 
@@ -55,7 +56,7 @@ export const getAllWebinars = async (req, res) => {
   }
 };
 
-// Get webinar by ID for admin
+// Get webinar by ID or slug for admin
 export const getWebinarById = async (req, res) => {
   try {
     const { webinarId } = req.params;
@@ -73,9 +74,21 @@ export const getWebinarById = async (req, res) => {
       ];
     }
 
-    const webinar = await Webinar.findById(webinarId)
-      .select(selectFields)
-      .populate(populateFields);
+    // Determine if the parameter is a MongoDB ObjectId or a slug
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(webinarId) && /^[0-9a-fA-F]{24}$/.test(webinarId);
+
+    let webinar;
+    if (isValidObjectId) {
+      // Search by MongoDB _id
+      webinar = await Webinar.findById(webinarId)
+        .select(selectFields)
+        .populate(populateFields);
+    } else {
+      // Search by slug
+      webinar = await Webinar.findOne({ slug: webinarId })
+        .select(selectFields)
+        .populate(populateFields);
+    }
 
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
@@ -384,15 +397,25 @@ export const getPublicWebinars = async (req, res) => {
   }
 };
 
-// Get public webinar by ID
+// Get public webinar by ID or slug
 export const getPublicWebinarById = async (req, res) => {
   try {
     const { webinarId } = req.params;
 
-    const webinar = await Webinar.findOne({
-      _id: webinarId,
-      portalDisplay: 'Yes'
-    })
+    // Determine if the parameter is a MongoDB ObjectId or a slug
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(webinarId) && /^[0-9a-fA-F]{24}$/.test(webinarId);
+
+    let query = { portalDisplay: 'Yes' };
+
+    if (isValidObjectId) {
+      // Search by MongoDB _id
+      query._id = webinarId;
+    } else {
+      // Search by slug
+      query.slug = webinarId;
+    }
+
+    const webinar = await Webinar.findOne(query)
       .populate('createdBy', 'name email');
 
     if (!webinar) {
