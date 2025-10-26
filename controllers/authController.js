@@ -51,27 +51,27 @@ export const registerUser = async (req, res) => {
     );
 
     // === Create HubSpot contact ===
-    const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
-    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+    // const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
+    // const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
 
 
-    console.log(HUBSPOT_API_URL);
+    // console.log(HUBSPOT_API_URL);
 
-    const hubSpotContact = {
-      properties: {
-        email: user.email,
-        firstname: user.firstName,
-        lastname: user.lastName,
-        phone: user.phone,
-      },
-    };
+    // const hubSpotContact = {
+    //   properties: {
+    //     email: user.email,
+    //     firstname: user.firstName,
+    //     lastname: user.lastName,
+    //     phone: user.phone,
+    //   },
+    // };
 
-    await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    // await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+    //   headers: {
+    //     Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+    //     'Content-Type': 'application/json',
+    //   },
+    // });
 
     // === Send verification email ===
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
