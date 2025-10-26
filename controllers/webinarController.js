@@ -298,6 +298,31 @@ export const deleteWebinar = async (req, res) => {
   }
 };
 
+// Admin ends/finishes a webinar
+export const endWebinar = async (req, res) => {
+  try {
+    const { webinarId } = req.params;
+
+    const webinar = await Webinar.findById(webinarId);
+
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Update webinar status to 'Ended'
+    webinar.status = 'Ended';
+    await webinar.save();
+
+    res.status(200).json({
+      message: 'Webinar ended successfully',
+      webinar
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error ending webinar' });
+  }
+};
+
 // Admin views all attendees for a webinar
 export const viewAttendees = async (req, res) => {
   try {
