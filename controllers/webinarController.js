@@ -22,9 +22,9 @@ export const getAllWebinars = async (req, res) => {
     }
 
     if (fields === 'basic') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay createdAt';
+      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay ctas createdAt';
     } else if (fields === 'detailed') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite recording createdAt attendees';
+      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite recording ctas createdAt attendees';
       populateFields = [
         { path: 'proSmsList', select: 'name' },
         { path: 'createdBy', select: 'name email' }
@@ -122,7 +122,8 @@ export const createWebinar = async (req, res) => {
       proSms,
       proSmsTime,
       attendOverwrite,
-      recording
+      recording,
+      ctas
     } = req.body;
 
     const createdBy = req.user.id;
@@ -133,6 +134,14 @@ export const createWebinar = async (req, res) => {
       return res.status(400).json({ message: 'Slug already exists' });
     }
 
+    // Validate CTAs if provided
+    if (ctas && Array.isArray(ctas)) {
+      for (const cta of ctas) {
+        if (!cta.label || !cta.link) {
+          return res.status(400).json({ message: 'Each CTA must have both label and link' });
+        }
+      }
+    }
 
     const newWebinar = new Webinar({
       streamType,
@@ -153,6 +162,7 @@ export const createWebinar = async (req, res) => {
       proSmsTime,
       attendOverwrite,
       recording,
+      ctas: ctas || [],
       createdBy
     });
 
@@ -195,7 +205,8 @@ export const updateWebinar = async (req, res) => {
       proSms,
       proSmsTime,
       attendOverwrite,
-      recording
+      recording,
+      ctas
     } = req.body;
 
     // Check if slug already exists (excluding current webinar)
@@ -206,6 +217,15 @@ export const updateWebinar = async (req, res) => {
       });
       if (existingWebinar) {
         return res.status(400).json({ message: 'Slug already exists' });
+      }
+    }
+
+    // Validate CTAs if provided
+    if (ctas && Array.isArray(ctas)) {
+      for (const cta of ctas) {
+        if (!cta.label || !cta.link) {
+          return res.status(400).json({ message: 'Each CTA must have both label and link' });
+        }
       }
     }
 
@@ -227,7 +247,8 @@ export const updateWebinar = async (req, res) => {
       proSms,
       proSmsTime,
       attendOverwrite,
-      recording
+      recording,
+      ctas
     };
 
     // Remove undefined values
@@ -372,9 +393,9 @@ export const getPublicWebinars = async (req, res) => {
     }
 
     if (fields === 'basic') {
-      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments attendees';
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees';
     } else {
-      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments attendees';
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees';
       populateFields = [
         { path: 'createdBy', select: 'name email' }
       ];

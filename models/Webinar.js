@@ -105,6 +105,20 @@ const webinarSchema = new Schema({
     trim: true,
   },
 
+  // Call to Action buttons
+  ctas: [{
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    link: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  }],
+
   // Registration and attendance tracking
   attendees: [{
     user: {
