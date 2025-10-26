@@ -467,7 +467,7 @@ export const registerForWebinar = async (req, res) => {
 
     // Check if the user is already registered
     if (webinar.attendees.some((attendee) => attendee.user.toString() === userId.toString())) {
-      return res.status(400).json({ message: 'User is already registered for this webinar' });
+      return res.status(401).json({ message: 'User is already registered for this webinar' });
     }
 
     // Check if max attendees have been reached
