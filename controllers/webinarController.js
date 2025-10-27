@@ -451,7 +451,7 @@ export const getPublicWebinarById = async (req, res) => {
     // Determine if the parameter is a MongoDB ObjectId or a slug
     const isValidObjectId = mongoose.Types.ObjectId.isValid(webinarId) && /^[0-9a-fA-F]{24}$/.test(webinarId);
 
-    let query = { portalDisplay: 'Yes' };
+    let query = {};
 
     if (isValidObjectId) {
       // Search by MongoDB _id
