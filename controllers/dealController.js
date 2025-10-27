@@ -16,34 +16,23 @@ export const createDeal = async (req, res) => {
       image
     } = req.body;
 
-    // Validate required fields
-    if (
-      !name ||
-      !categoryIds?.length ||
-      !subCategoryIds?.length ||
-      !typeIds?.length ||
-      !strategyIds?.length ||
-      !requirementIds?.length ||
-      !sourceId ||
-      !createdBy ||
-      !url ||
-      !image
-    ) {
-      return res.status(400).json({ message: 'All fields are required' });
+    // Only validate that createdBy exists (can come from req.body or req.user)
+    const dealCreatorId = req.user?.id || createdBy;
+    if (!dealCreatorId) {
+      return res.status(400).json({ message: 'User authentication required' });
     }
 
     const deal = new Deal({
-      name,
-      category: categoryIds,
-      subCategory: subCategoryIds,
-      type: typeIds,
-      strategy: strategyIds,
-      requirement: requirementIds,
-      source: sourceId,
-      createdBy,
-      url,
-      image,
-      createdBy: req.user.id,
+      name: name || '',
+      category: categoryIds || [],
+      subCategory: subCategoryIds || [],
+      type: typeIds || [],
+      strategy: strategyIds || [],
+      requirement: requirementIds || [],
+      source: sourceId || null,
+      url: url || '',
+      image: image || '',
+      createdBy: dealCreatorId,
     });
 
     await deal.save();
@@ -58,7 +47,7 @@ export const createDeal = async (req, res) => {
 export const getAllDeals = async (req, res) => {
   try {
     const { fields = 'basic' } = req.query;
-    
+
     let populateFields = [];
     if (fields === 'basic') {
       // For basic list view - only essential fields
@@ -94,7 +83,7 @@ export const getAllDeals = async (req, res) => {
         { path: 'createdBy' }
       ];
     }
-    
+
     const deals = await Deal.find()
       .populate(populateFields)
       .lean();
@@ -170,16 +159,18 @@ export const updateDeal = async (req, res) => {
       return res.status(404).json({ message: 'Deal not found' });
     }
 
-    // Update fields if provided
-    deal.name = name || deal.name;
-    deal.category = categoryIds || deal.category;
-    deal.subCategory = subCategoryIds || deal.subCategory;
-    deal.type = typeIds || deal.type;
-    deal.strategy = strategyIds || deal.strategy;
-    deal.requirement = requirementIds || deal.requirement;
-    deal.source = sourceId || deal.source;
-    deal.url = url || deal.url;
-    deal.image = image || deal.image;
+    // Update fields - allow empty values to be set explicitly
+    // Use hasOwnProperty to differentiate between undefined (not provided) and empty string/array (intentionally empty)
+    if (req.body.hasOwnProperty('name')) deal.name = name || '';
+    if (req.body.hasOwnProperty('categoryIds')) deal.category = categoryIds || [];
+    if (req.body.hasOwnProperty('subCategoryIds')) deal.subCategory = subCategoryIds || [];
+    if (req.body.hasOwnProperty('typeIds')) deal.type = typeIds || [];
+    if (req.body.hasOwnProperty('strategyIds')) deal.strategy = strategyIds || [];
+    if (req.body.hasOwnProperty('requirementIds')) deal.requirement = requirementIds || [];
+    if (req.body.hasOwnProperty('sourceId')) deal.source = sourceId || null;
+    if (req.body.hasOwnProperty('url')) deal.url = url || '';
+    if (req.body.hasOwnProperty('image')) deal.image = image || '';
+
     await deal.save();
     return res.status(200).json({ message: 'Deal updated successfully', deal });
   } catch (error) {

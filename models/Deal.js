@@ -5,6 +5,12 @@ const { Schema } = mongoose;
 /**
  * Deal Schema
  * 
+ * Field Requirements:
+ * - Most fields are optional to allow flexible deal creation
+ * - Empty strings and arrays are allowed
+ * - Only createdBy is required for tracking purposes
+ * - Image field supports both file paths (from uploads) and direct URLs
+ * 
  * Date Handling Strategy:
  * - MongoDB stores ALL dates in UTC automatically (via timestamps: true)
  * - createdAt and updatedAt are automatically managed by Mongoose
@@ -16,56 +22,52 @@ const dealSchema = new Schema(
   {
     name: {
       type: String,
-      required: true,
       trim: true,
+      default: '',
     },
     category: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
-        required: true,
       },
     ],
     subCategory: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'SubCategory',
-        required: true,
       },
     ],
     type: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Type',
-        required: true,
       },
     ],
     strategy: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Strategy',
-        required: true,
       },
     ],
     requirement: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Requirement',
-        required: true,
       },
     ],
     image: {
       type: String,
       trim: true,
+      default: '',
     },
     url: {
       type: String,
       trim: true,
+      default: '',
     },
     source: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Source',
-      required: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
