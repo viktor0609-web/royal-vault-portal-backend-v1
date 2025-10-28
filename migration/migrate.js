@@ -35,7 +35,9 @@ function transformUser(bubbleUser) {
 
 // Fetch Bubble users in pages
 async function fetchBubbleUsers(cursor = 0) {
+    console.log(`Fetching Bubble users ${cursor}`);
     const url = `https://${BUBBLE_APP_NAME}.bubbleapps.io/api/1.1/obj/User`;
+    console.log(url);
     const params = { cursor, limit: PAGE_LIMIT };
     const res = await axios.get(url, { headers, params });
     return res.data.response.results;
@@ -49,13 +51,14 @@ async function migrateUsers() {
     while (true) {
         const users = await fetchBubbleUsers(cursor);
         if (!users || users.length === 0) break;
+        console.log(users);
 
-        const mongoUsers = users.map(transformUser);
-        await User.insertMany(mongoUsers, { ordered: false });
-        totalMigrated += mongoUsers.length;
+        // const mongoUsers = users.map(transformUser);
+        // await User.insertMany(mongoUsers, { ordered: false });
+        // totalMigrated += mongoUsers.length;
 
-        console.log(`✅ Migrated ${totalMigrated} users so far...`);
-        cursor += users.length;
+        // console.log(`✅ Migrated ${totalMigrated} users so far...`);
+        // cursor += users.length;
     }
 
     console.log(`🎉 Migration complete. Total users migrated: ${totalMigrated}`);
