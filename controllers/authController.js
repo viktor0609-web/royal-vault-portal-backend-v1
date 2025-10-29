@@ -51,27 +51,24 @@ export const registerUser = async (req, res) => {
     );
 
     // === Create HubSpot contact ===
-    // const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
-    // const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+    const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
 
+    const hubSpotContact = {
+      properties: {
+        email: user.email,
+        firstname: user.firstName,
+        lastname: user.lastName,
+        phone: user.phone,
+      },
+    };
 
-    // console.log(HUBSPOT_API_URL);
-
-    // const hubSpotContact = {
-    //   properties: {
-    //     email: user.email,
-    //     firstname: user.firstName,
-    //     lastname: user.lastName,
-    //     phone: user.phone,
-    //   },
-    // };
-
-    // await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-    //   headers: {
-    //     Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-    //     'Content-Type': 'application/json',
-    //   },
-    // });
+    await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+      headers: {
+        Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     // === Send verification email ===
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
@@ -108,7 +105,6 @@ export const registerUser = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
 
-    console.log(e)
     console.error('Registration error:', e.message);
     if (e.status == 409) {
       res.status(500).json({ message: "You are already registered in our system" });
@@ -228,19 +224,17 @@ export const getUser = async (req, res) => {
       });
 
       const contact = response.data;
-      console.log("HubSpot Contact:", contact);
 
       // Merge user data with HubSpot properties, prioritizing HubSpot data
       const profileData = {
         ...user.toObject(),
         ...contact.properties,
       };
-      console.log("Profile Data:", profileData);
       res.json(profileData);
     }
     catch (hubspotError) {
 
-      console.log("HubSpot API error:", hubspotError.response?.data || hubspotError.message);
+      console.error("HubSpot API error:", hubspotError.response?.data || hubspotError.message);
       // If HubSpot fails, return just the user data
       res.json(user);
     }
