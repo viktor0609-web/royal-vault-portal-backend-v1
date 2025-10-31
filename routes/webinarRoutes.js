@@ -19,6 +19,11 @@ import {
   unregisterFromWebinar,
   isValidEmailAddress
 } from '../controllers/webinarController.js';
+import {
+  saveMessage,
+  getMessages,
+  clearMessages
+} from '../controllers/chatController.js';
 
 const router = express.Router();
 
@@ -31,6 +36,11 @@ router.post('/isValidEmailAddress', isValidEmailAddress);
 router.post('/:webinarId/register', protect, registerForWebinar); // Register user for a webinar
 router.post('/:webinarId/attend', protect, markAsAttended); // Mark user as attended for a webinar
 router.delete('/:webinarId/unregister', protect, unregisterFromWebinar); // Unregister user from a webinar
+
+// ==================== CHAT ROUTES ====================
+router.post('/:webinarId/chat', saveMessage); // Save a chat message (public, but should include sender info)
+router.get('/:webinarId/chat', getMessages); // Get all chat messages for a webinar (public)
+router.delete('/:webinarId/chat', clearMessages); // Clear chat messages (admin only) but currently public
 
 // ==================== ADMIN ROUTES ====================
 router.get('/admin', protect, authorize('admin'), getAllWebinars); // Get all webinars for admin
