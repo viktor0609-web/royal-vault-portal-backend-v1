@@ -46,11 +46,10 @@ export const createDeal = async (req, res) => {
 // Get all deals - OPTIMIZED VERSION
 export const getAllDeals = async (req, res) => {
   try {
-    const { fields = 'basic' } = req.query;
+    const { fields = 'basic', sortBy = 'name', order = 'asc' } = req.query;
 
     let populateFields = [];
     if (fields === 'basic') {
-      // For basic list view - only essential fields
       populateFields = [
         { path: 'category', select: 'name' },
         { path: 'subCategory', select: 'name' },
@@ -60,19 +59,7 @@ export const getAllDeals = async (req, res) => {
         { path: 'source', select: 'name' },
         { path: 'createdBy', select: 'name' }
       ];
-    } else if (fields === 'detailed') {
-      // For detailed view - all fields but no deep population
-      populateFields = [
-        { path: 'category' },
-        { path: 'subCategory' },
-        { path: 'type' },
-        { path: 'strategy' },
-        { path: 'requirement' },
-        { path: 'source' },
-        { path: 'createdBy' }
-      ];
-    } else if (fields === 'full') {
-      // For admin view - all fields with full population
+    } else if (fields === 'detailed' || fields === 'full') {
       populateFields = [
         { path: 'category' },
         { path: 'subCategory' },
@@ -84,10 +71,18 @@ export const getAllDeals = async (req, res) => {
       ];
     }
 
+    // Define sort order: asc = 1, desc = -1
+    const sortOrder = order === 'desc' ? -1 : 1;
+
+    // Fetch and sort alphabetically by the 'sortBy' field
     const deals = await Deal.find()
       .populate(populateFields)
+      .sort({ [sortBy]: sortOrder })
       .lean();
-    return res.status(200).json({ message: 'Deals fetched successfully', deals });
+
+    return res
+      .status(200)
+      .json({ message: 'Deals fetched successfully', deals });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server Error', error });
