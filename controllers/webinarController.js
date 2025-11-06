@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Webinar from '../models/Webinar.js';
 import mongoose from 'mongoose';
+import { WebinarOnRecording } from '../models/Webinar.js';
 
 // ==================== ADMIN FUNCTIONS ====================
 
@@ -583,5 +584,23 @@ export const isValidEmailAddress = async (req, res) => {
   catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error' });
+  }
+}
+
+export const setWebinarOnRecording = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    await WebinarOnRecording.deleteMany({});
+    const newWebinarOnRecording = new WebinarOnRecording({
+      slug: slug
+    });
+    await newWebinarOnRecording.save();
+    res.status(200).json({ message: 'Webinar on recording created successfully' });
+
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error setting webinar on recording' });
   }
 }

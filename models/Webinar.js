@@ -12,6 +12,16 @@ const { Schema } = mongoose;
  * - NEVER manually convert dates before saving to MongoDB - let MongoDB handle UTC storage
  * - When receiving dates from frontend forms, ensure they're properly converted to UTC before saving
  */
+
+const webinarOnRecordingSchema = new Schema({
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+  },
+}, { timestamps: true });
+
 const webinarSchema = new Schema({
   // Core webinar fields
   streamType: {
@@ -150,3 +160,5 @@ const webinarSchema = new Schema({
 // Create the Webinar model
 const Webinar = mongoose.model('Webinar', webinarSchema);
 export default Webinar;
+
+export const WebinarOnRecording = mongoose.model('WebinarOnRecording', webinarOnRecordingSchema);

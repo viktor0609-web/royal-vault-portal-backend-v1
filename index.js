@@ -4,6 +4,7 @@ import cors from 'cors';
 import connectDB from './config/db.js';
 import routes from './routes/index.js';
 import morgan from 'morgan';
+import { WebinarOnRecording } from './models/Webinar.js';
 
 dotenv.config();
 connectDB();
@@ -36,7 +37,7 @@ app.get('/', (req, res) => {
   res.send("RLS's client portal API is running");
 });
 
-app.post("/webhook/daily", (req, res) => {
+app.post("/webhook/daily", async (req, res) => {
   const event = req.body;
 
   // Log all incoming events for debugging
@@ -52,8 +53,14 @@ app.post("/webhook/daily", (req, res) => {
       break;
 
     case "recording.ready-to-download":
-      console.log("Recording ready to download:", event.payload.recording.url);
-      // You can save the recording URL to your database here
+
+      const webinar = await WebinarOnRecording.findOne({});
+
+      if (!webinar) {
+        return res.status(404).json({ message: 'Webinar not found' });
+      }
+      webinar.recording = event.payload.recording.url;
+      await webinar.save();
       break;
 
     default:
