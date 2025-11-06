@@ -61,7 +61,7 @@ app.post("/webhook/daily", async (req, res) => {
     const downloadUrl = data.url;
 
     console.log("Recording ready for room:", room_name);
-    console.log("Download URL:", downloadUrl);
+    console.log("Download:", data);
 
     // Save to your DB
     const webinar = await WebinarOnRecording.findOne();
