@@ -47,6 +47,7 @@ app.post("/webhook/daily", async (req, res) => {
     const { recording_id, room_name } = event.payload;
 
     console.log("Daily API Key:", process.env.DAILY_API_KEY);
+    console.log("Recording ID:", recording_id);
 
 
     // Fetch download link from Daily API
