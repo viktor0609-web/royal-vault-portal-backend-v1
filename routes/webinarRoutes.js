@@ -17,7 +17,8 @@ import {
   registerForWebinar,
   markAsAttended,
   unregisterFromWebinar,
-  isValidEmailAddress
+  isValidEmailAddress,
+  setWebinarOnRecording
 } from '../controllers/webinarController.js';
 import {
   saveMessage,
@@ -52,5 +53,6 @@ router.post('/admin/:webinarId/end', protect, authorize('admin'), endWebinar); /
 router.get('/admin/:webinarId/attendees', viewAttendees); // View all attendees for a specific webinar
 router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended); // Mark a user as attended for a specific webinar
 router.post('/admin/:webinarId/user/:userId/missed', protect, authorize('admin'), adminMarkAsMissed); // Mark a user as missed for a specific webinar
+router.post('/admin/:slug/on-recording', setWebinarOnRecording); // Set webinar on recording
 
 export default router;
