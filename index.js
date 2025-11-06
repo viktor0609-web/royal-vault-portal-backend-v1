@@ -36,6 +36,31 @@ app.get('/', (req, res) => {
   res.send("RLS's client portal API is running");
 });
 
+app.post("/webhook/daily", (req, res) => {
+  const event = req.body;
+
+  // Log all incoming events for debugging
+  console.log("Received Daily.co webhook:", event);
+
+  // Respond immediately with 200 OK
+  res.status(200).send("Webhook received");
+
+  // Handle events asynchronously
+  switch (event.event) {
+    case "recording.started":
+      console.log("Recording started for room:", event.payload.roomName);
+      break;
+
+    case "recording.ready-to-download":
+      console.log("Recording ready to download:", event.payload.recording.url);
+      // You can save the recording URL to your database here
+      break;
+
+    default:
+      console.log("Unhandled event type:", event.event);
+  }
+});
+
 // Auth routes
 app.use('/api', routes);
 
