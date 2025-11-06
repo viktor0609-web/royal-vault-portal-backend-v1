@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import routes from './routes/index.js';
 import morgan from 'morgan';
 import { WebinarOnRecording } from './models/Webinar.js';
+import Webinar from './models/Webinar.js';
 
 dotenv.config();
 connectDB();
