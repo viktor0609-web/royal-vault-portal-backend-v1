@@ -46,6 +46,9 @@ app.post("/webhook/daily", async (req, res) => {
   if (event.type === "recording.ready-to-download") {
     const { recording_id, room_name } = event.payload;
 
+    console.log("Daily API Key:", process.env.DAILY_API_KEY);
+
+
     // Fetch download link from Daily API
     const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
       headers: {
