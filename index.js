@@ -47,7 +47,7 @@ app.post("/webhook/daily", async (req, res) => {
   res.status(200).send("Webhook received");
 
   // Handle events asynchronously
-  switch (event.event) {
+  switch (event) {
     case "recording.started":
       console.log("Recording started for room:", event.payload.roomName);
       break;
