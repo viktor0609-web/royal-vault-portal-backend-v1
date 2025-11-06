@@ -60,13 +60,18 @@ app.post("/webhook/daily", async (req, res) => {
     console.log("Download URL:", downloadUrl);
 
     // Save to your DB
-    const webinar = await WebinarOnRecording.findOne();
-    console.log("Webinar:", webinar);
-    if (webinar) {
-      webinar.recording = downloadUrl;
-      await webinar.save();
-      console.log("Recording URL saved to webinar");
+    const webinarOnRecording = await WebinarOnRecording.findOne();
+
+    if (!webinarOnRecording) {
+      return res.status(404).json({ message: 'Webinar on recording not found' });
     }
+    const webinar = await Webinar.findOne({ slug: webinarOnRecording.slug });
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+    webinar.recording = downloadUrl;
+    await webinar.save();
+    console.log("Recording URL saved to webinar");
   }
 });
 
