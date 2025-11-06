@@ -46,10 +46,6 @@ app.post("/webhook/daily", async (req, res) => {
   if (event.type === "recording.ready-to-download") {
     const { recording_id, room_name } = event.payload;
 
-    console.log("Daily API Key:", process.env.DAILY_API_KEY);
-    console.log("Recording ID:", recording_id);
-
-
     // Fetch download link from Daily API
     const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
       headers: {
@@ -59,10 +55,7 @@ app.post("/webhook/daily", async (req, res) => {
     });
 
     const data = await response.json();
-    const downloadUrl = data.url;
-
-    console.log("Recording ready for room:", room_name);
-    console.log("Download:", data);
+    const downloadUrl = data.download_link;
 
     // Save to your DB
     const webinar = await WebinarOnRecording.findOne();
