@@ -40,36 +40,36 @@ app.get('/', (req, res) => {
 app.post("/webhook/daily", async (req, res) => {
   const event = req.body;
 
-  // Log all incoming events for debugging
-  console.log("Received Daily.co webhook:", event);
-
-  // Respond immediately with 200 OK
+  // Respond immediately
   res.status(200).send("Webhook received");
 
-  // Handle events asynchronously
-  switch (event) {
-    case "recording.started":
-      console.log("Recording started for room:", event.payload.roomName);
-      break;
+  if (event.type === "recording.ready-to-download") {
+    const { recording_id, room_name } = event.payload;
 
-    case "recording.ready-to-download":
-
-      console.log("Recording ready to download:", event.payload.recording.url);
-
-      const webinar = await WebinarOnRecording.findOne({});
-
-      if (!webinar) {
-        return res.status(404).json({ message: 'Webinar not found' });
+    // Fetch download link from Daily API
+    const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.DAILY_API_KEY}`,
+        "Content-Type": "application/json"
       }
-      webinar.recording = event.payload.recording.url;
+    });
+
+    const data = await response.json();
+    const downloadUrl = data.url;
+
+    console.log("Recording ready for room:", room_name);
+    console.log("Download URL:", downloadUrl);
+
+    // Save to your DB
+    const webinar = await WebinarOnRecording.findOne();
+    if (webinar) {
+      webinar.recording = downloadUrl;
       await webinar.save();
-
-      break;
-
-    default:
-      console.log("Unhandled event type:", event.event);
+      console.log("Recording URL saved to webinar");
+    }
   }
 });
+
 
 // Auth routes
 app.use('/api', routes);
