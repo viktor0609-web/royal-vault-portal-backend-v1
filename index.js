@@ -54,6 +54,8 @@ app.post("/webhook/daily", async (req, res) => {
 
     case "recording.ready-to-download":
 
+      console.log("Recording ready to download:", event.payload.recording.url);
+
       const webinar = await WebinarOnRecording.findOne({});
 
       if (!webinar) {
@@ -61,6 +63,7 @@ app.post("/webhook/daily", async (req, res) => {
       }
       webinar.recording = event.payload.recording.url;
       await webinar.save();
+
       break;
 
     default:
