@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import Webinar from '../models/Webinar.js';
 import mongoose from 'mongoose';
 import { WebinarOnRecording } from '../models/Webinar.js';
+import sendEmail from '../utils/sendEmail.js';
 
 // ==================== ADMIN FUNCTIONS ====================
 
@@ -479,6 +480,7 @@ export const getPublicWebinarById = async (req, res) => {
 // Register user for a webinar
 export const registerForWebinar = async (req, res) => {
   try {
+    const user = req.user;
     const userId = req.user._id; // Get user ID from the user object
     const { webinarId } = req.params;
 
@@ -505,6 +507,26 @@ export const registerForWebinar = async (req, res) => {
     // Register user for the webinar
     webinar.attendees.push({ user: userId, attendanceStatus: 'registered' });
     await webinar.save();
+
+    const datePart = webinar.date.toLocaleDateString(); // e.g. "11/11/2025"
+    const timePart = webinar.date.toLocaleTimeString(); // e.g. "3:30:00 PM"
+
+    // Send email to user
+    const userUrl = `${process.env.CLIENT_URL}/royal-tv/${webinar.slug}/user?is_user=true`;
+    const templateId = process.env.WEBINAR_CONFIRMATION_TEMPLATE_ID;
+    const data = {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      link: userUrl,
+      subject: "Royal Vault Portal - Webinar Registration",
+      date: datePart,
+      time: timePart,
+      webinarName: webinar.name,
+      description: webinar.line1,
+    };
+
+    console.log("data:", data);
+    await sendEmail(user.email, data, templateId);
 
     res.status(200).json({ message: 'Successfully registered for the webinar' });
   } catch (error) {
