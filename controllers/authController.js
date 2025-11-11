@@ -350,6 +350,7 @@ export const resetPassword = async (req, res) => {
 
 // Update user profile
 export const updateProfile = async (req, res) => {
+
   try {
     const { firstName, lastName, email, phone, utms, lifecyclestage, street, city, state, postal } = req.body;
     const userId = req.user.id;
@@ -391,15 +392,16 @@ export const updateProfile = async (req, res) => {
         };
 
         // Add UTM parameters if provided
-        if (user.utms) {
-          hubSpotContact.properties.utms = user.utms;
-        }
 
+        hubSpotContact.properties.utms = user.utms;
         // Add address fields if provided
-        if (user.street) hubSpotContact.properties.address = street;
-        if (user.city) hubSpotContact.properties.city = city;
-        if (user.state) hubSpotContact.properties.state = state;
-        if (user.postal) hubSpotContact.properties.zip = postal;
+        hubSpotContact.properties.address = street;
+        hubSpotContact.properties.city = city;
+        hubSpotContact.properties.state = state;
+        hubSpotContact.properties.zip = postal;
+
+        console.log("HubSpot Contact:", hubSpotContact);
+
 
         // Update HubSpot contact
         await axios.patch(
