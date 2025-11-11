@@ -520,7 +520,7 @@ export const registerForWebinar = async (req, res) => {
       link: userUrl,
       subject: "Royal Vault Portal - Webinar Registration",
       date: datePart,
-      time: timePart,
+      time: timePart + " GMT",
       webinarName: webinar.name,
       description: webinar.line1,
     };
