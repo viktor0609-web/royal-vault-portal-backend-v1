@@ -1,22 +1,23 @@
 import sgMail from "@sendgrid/mail";
 
 
-const sendEmail = async (to, firstName, url, templateId) => {
+const sendEmail = async (to, firstName, url, templateId, subject) => {
   try {
 
     const msg = {
       to,
-      templateId:templateId,
+      templateId: templateId,
       from: process.env.SENDGRID_FROM_EMAIL, // must be verified sender
       dynamic_template_data: {
         firstName,
         url,
-      }
+      },
+      subject: subject
     };
 
-    
+
     console.log("Sending email via SendGrid:", msg);
-    
+
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
     const response = await sgMail.send(msg);
 
@@ -25,5 +26,5 @@ const sendEmail = async (to, firstName, url, templateId) => {
     console.error("Email sending failed (SendGrid):", error.response?.body || error);
   }
 };
- 
+
 export default sendEmail;

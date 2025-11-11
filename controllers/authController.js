@@ -73,7 +73,7 @@ export const registerUser = async (req, res) => {
     // === Send verification email ===
     const verificationUrl = `${process.env.CLIENT_URL}/verify/${verificationToken}`;
     const templateId = process.env.ACCOUNT_VERIFICATION_TEMPLATE_ID;
-    await sendEmail(user.email, `${user.firstName} ${user.lastName}`, verificationUrl, templateId);
+    await sendEmail(user.email, `${user.firstName} ${user.lastName}`, verificationUrl, templateId, "Royal Vault Portal - Account Verification");
 
     // === Generate JWT tokens ===
     const accessToken = jwt.sign(
@@ -302,7 +302,7 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
     const templateId = process.env.PASSWORD_RESET_TEMPLATE_ID;
-    await sendEmail(email, user.firstName + user.lastName, resetUrl, templateId);
+    await sendEmail(email, user.firstName + user.lastName, resetUrl, templateId, "Royal Vault Portal - Password Reset");
 
     res.json({ message: 'Password reset email sent.' });
   } catch (e) {
