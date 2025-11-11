@@ -11,8 +11,8 @@ const sendEmail = async (to, firstName, url, templateId, subject) => {
       dynamic_template_data: {
         firstName,
         url,
+        subject,
       },
-      subject: subject
     };
 
 
