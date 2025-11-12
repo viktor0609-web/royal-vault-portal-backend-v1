@@ -18,7 +18,8 @@ import {
   markAsAttended,
   unregisterFromWebinar,
   isValidEmailAddress,
-  setWebinarOnRecording
+  setWebinarOnRecording,
+  getDownloadLink
 } from '../controllers/webinarController.js';
 import {
   saveMessage,
@@ -54,5 +55,6 @@ router.get('/admin/:webinarId/attendees', viewAttendees); // View all attendees 
 router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended); // Mark a user as attended for a specific webinar
 router.post('/admin/:webinarId/user/:userId/missed', protect, authorize('admin'), adminMarkAsMissed); // Mark a user as missed for a specific webinar
 router.post('/admin/:slug/on-recording', setWebinarOnRecording); // Set webinar on recording
+router.get('/admin/:rawRecordingId/download-link', getDownloadLink); // Get download link for a recording
 
 export default router;

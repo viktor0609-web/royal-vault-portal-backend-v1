@@ -629,15 +629,17 @@ export const setWebinarOnRecording = async (req, res) => {
 
 export const getDownloadLink = async (req, res) => {
   try {
-    const { recording_id } = req.params;
+    const { rawRecordingId } = req.params;
 
     // Fetch download link from Daily API
-    const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
+    const response = await fetch(`https://api.daily.co/v1/recordings/${rawRecordingId}/access-link`, {
       headers: {
         "Authorization": `Bearer ${process.env.DAILY_API_KEY}`,
         "Content-Type": "application/json"
       }
     });
+
+    console.log("Response:", response);
 
     const data = await response.json();
     console.log("Download:", data);
