@@ -39,6 +39,7 @@ app.get('/', (req, res) => {
 });
 
 app.post("/webhook/daily", async (req, res) => {
+  console.log("Webhook received");
   const event = req.body;
 
   // Respond immediately
@@ -48,17 +49,17 @@ app.post("/webhook/daily", async (req, res) => {
     const { recording_id, room_name } = event.payload;
 
     // Fetch download link from Daily API
-    const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
-      headers: {
-        "Authorization": `Bearer ${process.env.DAILY_API_KEY}`,
-        "Content-Type": "application/json"
-      }
-    });
+    // const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
+    //   headers: {
+    //     "Authorization": `Bearer ${process.env.DAILY_API_KEY}`,
+    //     "Content-Type": "application/json"
+    //   }
+    // });
 
-    const data = await response.json();
-    console.log("Download:", data);
-    const downloadUrl = data.download_link;
-    console.log("Download URL:", downloadUrl);
+    // const data = await response.json();
+    // console.log("Download:", data);
+    // const downloadUrl = data.download_link;
+    // console.log("Download URL:", downloadUrl);
 
     // Save to your DB
     const webinarOnRecording = await WebinarOnRecording.findOne();
@@ -70,9 +71,10 @@ app.post("/webhook/daily", async (req, res) => {
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
-    webinar.recording = downloadUrl;
+    webinar.rawRecordingId = recording_id;
+    console.log("Recording ID:", recording_id);
     await webinar.save();
-    console.log("Recording URL saved to webinar");
+    console.log("Recording ID saved to webinar");
   }
 });
 

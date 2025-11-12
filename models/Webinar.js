@@ -110,6 +110,12 @@ const webinarSchema = new Schema({
     type: Number,
     default: 100,
   },
+
+  rawRecordingId: {
+    type: String,
+    trim: true,
+  },
+
   recording: {
     type: String,
     trim: true,
