@@ -26,7 +26,7 @@ export const getAllWebinars = async (req, res) => {
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay ctas createdAt';
     } else if (fields === 'detailed') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite recording ctas createdAt attendees';
+      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite rawRecordingId ctas createdAt attendees';
       populateFields = [
         { path: 'proSmsList', select: 'name' },
         { path: 'createdBy', select: 'name email' }
@@ -124,7 +124,7 @@ export const createWebinar = async (req, res) => {
       proSms,
       proSmsTime,
       attendOverwrite,
-      recording,
+      rawRecordingId,
       ctas
     } = req.body;
 
@@ -163,7 +163,7 @@ export const createWebinar = async (req, res) => {
       proSms,
       proSmsTime,
       attendOverwrite,
-      recording,
+      rawRecordingId,
       ctas: ctas || [],
       createdBy
     });
@@ -624,5 +624,29 @@ export const setWebinarOnRecording = async (req, res) => {
   catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error setting webinar on recording' });
+  }
+}
+
+export const getDownloadLink = async (req, res) => {
+  try {
+    const { recording_id } = req.params;
+
+    // Fetch download link from Daily API
+    const response = await fetch(`https://api.daily.co/v1/recordings/${recording_id}/access-link`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.DAILY_API_KEY}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    const data = await response.json();
+    console.log("Download:", data);
+    const downloadUrl = data.download_link;
+    console.log("Download URL:", downloadUrl);
+
+    res.status(200).json({ message: 'Download link fetched successfully', downloadUrl });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error getting download link' });
   }
 }
