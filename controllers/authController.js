@@ -150,7 +150,7 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!user) return res.status(404).json({ message: 'You are not registered yet. Please register first.' });
     if (!user.isVerified) {
       // return res.status(403).json({ message: 'Please verify your email before logging in.' });
       return res.status(403).json({ message: 'Please reset your email password before logging in. This was required due to the recent data migration.' });
@@ -158,7 +158,7 @@ export const loginUser = async (req, res) => {
 
 
     const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!ok) return res.status(401).json({ message: 'Invalid or incorrect password' });
 
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
