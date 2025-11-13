@@ -517,7 +517,7 @@ export const registerForWebinar = async (req, res) => {
       subject: "Royal Vault Portal - Webinar Registration",
       date: datePart,
       time: timePart + " GMT",
-      webinarName: webinar.name,
+      webinarName: webinar.line1,
       description: webinar.line1,
     };
 
