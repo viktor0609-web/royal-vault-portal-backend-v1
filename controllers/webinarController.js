@@ -421,7 +421,7 @@ export const getPublicWebinars = async (req, res) => {
     if (fields === 'basic') {
       selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees';
     } else {
-      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees';
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees recording';
       populateFields = [
         { path: 'createdBy', select: 'name email' }
       ];
