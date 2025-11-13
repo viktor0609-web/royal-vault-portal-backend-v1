@@ -44,9 +44,6 @@ export const getAllWebinars = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log("webinars:", webinars);
-
-
     res.status(200).json({
       message: 'Webinars fetched successfully',
       webinars,
@@ -272,6 +269,8 @@ export const updateWebinar = async (req, res) => {
       return res.status(404).json({ message: 'Webinar not found' });
     }
 
+    console.log("updatedWebinar:", updatedWebinar);
+
     res.status(200).json({
       message: 'Webinar updated successfully',
       webinar: updatedWebinar
@@ -484,9 +483,6 @@ export const registerForWebinar = async (req, res) => {
     const userId = req.user._id; // Get user ID from the user object
     const { webinarId } = req.params;
 
-    console.log('User ID:', userId);
-    console.log('Webinar ID:', webinarId);
-
     // Find the webinar
     const webinar = await Webinar.findById(webinarId);
     if (!webinar) {
@@ -525,7 +521,6 @@ export const registerForWebinar = async (req, res) => {
       description: webinar.line1,
     };
 
-    console.log("data:", data);
     await sendEmail(user.email, data, templateId);
 
     res.status(200).json({ message: 'Successfully registered for the webinar' });
@@ -569,9 +564,6 @@ export const unregisterFromWebinar = async (req, res) => {
   try {
     const userId = req.user._id; // Get user ID from the user object
     const { webinarId } = req.params;
-
-    console.log('User ID:', userId);
-    console.log('Webinar ID:', webinarId);
 
     // Find the webinar
     const webinar = await Webinar.findById(webinarId);
