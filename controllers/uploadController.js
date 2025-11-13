@@ -137,6 +137,154 @@ export const uploadFileController = async (req, res) => {
 };
 
 /**
+ * Generate signed upload URL for direct client upload
+ * @param {string} bucketName - Name of the storage bucket
+ * @param {string} filePath - Path where the file will be stored
+ */
+const generateSignedUploadUrl = async (bucketName, filePath) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUploadUrl(filePath);
+
+    if (error) {
+      console.error('Error generating signed upload URL:', error);
+      throw new Error(`Failed to generate signed URL: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in generateSignedUploadUrl:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get signed URL for reading a file (if needed)
+ * @param {string} bucketName - Name of the storage bucket
+ * @param {string} filePath - Path to the file in the bucket
+ * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
+ */
+export const getSignedUrl = async (bucketName, filePath, expiresIn = 3600) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error) {
+      console.error('Error generating signed URL:', error);
+      throw new Error(`Failed to generate signed URL: ${error.message}`);
+    }
+
+    return data.signedUrl;
+  } catch (error) {
+    console.error('Error in getSignedUrl:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate signed upload URL for image
+ * POST /api/upload/image/signed-url
+ * Body: { filename: string, contentType: string }
+ */
+export const generateImageUploadUrl = async (req, res) => {
+  try {
+    const { filename, contentType } = req.body;
+
+    if (!filename || !contentType) {
+      return res.status(400).json({
+        message: 'Filename and contentType are required'
+      });
+    }
+
+    // Validate it's an image
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).json({
+        message: 'Only image files are allowed'
+      });
+    }
+
+    // Generate unique filename
+    const uniqueFilename = generateUniqueFilename(filename);
+    const filePath = `images/${uniqueFilename}`;
+
+    // Generate signed upload URL
+    const signedUrlData = await generateSignedUploadUrl('royal-vault-images', filePath);
+
+    // Get public URL for after upload
+    const { data: { publicUrl } } = supabase.storage
+      .from('royal-vault-images')
+      .getPublicUrl(filePath);
+
+    res.status(200).json({
+      signedUrl: signedUrlData.signedUrl,
+      token: signedUrlData.token,
+      path: filePath,
+      publicUrl: publicUrl,
+      filename: uniqueFilename
+    });
+  } catch (error) {
+    console.error('Error generating image upload URL:', error);
+    res.status(500).json({
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Generate signed upload URL for file
+ * POST /api/upload/file/signed-url
+ * Body: { filename: string, contentType: string }
+ */
+export const generateFileUploadUrl = async (req, res) => {
+  try {
+    const { filename, contentType } = req.body;
+
+    if (!filename || !contentType) {
+      return res.status(400).json({
+        message: 'Filename and contentType are required'
+      });
+    }
+
+    // Generate unique filename
+    const uniqueFilename = generateUniqueFilename(filename);
+    const filePath = `files/${uniqueFilename}`;
+
+    // Generate signed upload URL
+    const signedUrlData = await generateSignedUploadUrl('royal-vault-files', filePath);
+
+    // Get public URL for after upload
+    const { data: { publicUrl } } = supabase.storage
+      .from('royal-vault-files')
+      .getPublicUrl(filePath);
+
+    console.log({
+      signedUrl: signedUrlData.signedUrl,
+      token: signedUrlData.token,
+      path: filePath,
+      publicUrl: publicUrl,
+      filename: uniqueFilename
+    })
+
+    res.status(200).json({
+      signedUrl: signedUrlData.signedUrl,
+      token: signedUrlData.token,
+      path: filePath,
+      publicUrl: publicUrl,
+      filename: uniqueFilename
+    });
+  } catch (error) {
+    console.error('Error generating file upload URL:', error);
+    res.status(500).json({
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Delete file from Supabase Storage
  * @param {string} bucketName - Name of the storage bucket
  * @param {string} filePath - Path to the file in the bucket
