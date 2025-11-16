@@ -38,6 +38,7 @@ const lectureSchema = new Schema(
     }],
     completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public page
   },
   { timestamps: true }
 );

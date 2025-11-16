@@ -149,12 +149,13 @@ export const getCourseGroupById = async (req, res) => {
       let lectures = [];
       if (fields === 'full' && course.lectures) {
         lectures = await Lecture.find({ _id: { $in: course.lectures } })
+          .select('title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage')
           .populate('createdBy', 'name email')
           .populate('completedBy', 'name email')
           .lean();
       } else if (fields === 'detailed' && course.lectures) {
         lectures = await Lecture.find({ _id: { $in: course.lectures } })
-          .select('title description videoUrl relatedFiles')
+          .select('title description videoUrl relatedFiles displayOnPublicPage')
           .lean();
       }
       
@@ -314,11 +315,11 @@ export const getCourseById = async (req, res) => {
     ];
     
     if (fields === 'full') {
-      populateFields.push({ path: 'lectures', select: 'title description content videoUrl relatedFiles createdBy createdAt completedBy' });
+      populateFields.push({ path: 'lectures', select: 'title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage' });
     } else if (fields === 'detailed') {
-      populateFields.push({ path: 'lectures', select: 'title description videoUrl relatedFiles' });
+      populateFields.push({ path: 'lectures', select: 'title description videoUrl relatedFiles displayOnPublicPage' });
     } else if (fields === 'basic') {
-      populateFields.push({ path: 'lectures', select: 'title description' });
+      populateFields.push({ path: 'lectures', select: 'title description displayOnPublicPage' });
     }
     
     const course = await Course.findById(req.params.id)
@@ -376,7 +377,8 @@ export const createLecture = async (req, res) => {
       content,
       videoUrl,
       relatedFiles = [],  
-      courseId 
+      courseId,
+      displayOnPublicPage = false
     } = req.body;
     
     console.log('Backend received relatedFiles:', relatedFiles);
@@ -419,7 +421,8 @@ export const createLecture = async (req, res) => {
       content,
       videoUrl,
       relatedFiles: cleanedRelatedFiles,
-      createdBy
+      createdBy,
+      displayOnPublicPage
     });
     
     // Add lecture to course's lectures array
@@ -477,7 +480,8 @@ export const updateLecture = async (req, res) => {
       description, 
       content,
       videoUrl,
-      relatedFiles 
+      relatedFiles,
+      displayOnPublicPage
     } = req.body;
     
     // Clean relatedFiles to remove any _id fields that might be sent from frontend
@@ -517,6 +521,7 @@ export const updateLecture = async (req, res) => {
     if (description !== undefined) updateData.description = description;
     if (content !== undefined) updateData.content = content;
     if (videoUrl !== undefined) updateData.videoUrl = videoUrl;
+    if (displayOnPublicPage !== undefined) updateData.displayOnPublicPage = displayOnPublicPage;
     // Always update relatedFiles if it's provided (even if empty array)
     if (relatedFiles !== undefined) {
       console.log('Updating relatedFiles with:', cleanedRelatedFiles);
