@@ -9,7 +9,7 @@ import sendEmail from '../utils/sendEmail.js';
 // Get all webinars for admin
 export const getAllWebinars = async (req, res) => {
   try {
-    const { fields = 'full', status, streamType } = req.query;
+    const { fields = 'full', status, streamType, orderBy = 'date', order = 'desc' } = req.query;
 
     let selectFields = '';
     let populateFields = [];
@@ -38,10 +38,16 @@ export const getAllWebinars = async (req, res) => {
       ];
     }
 
+    // Build sort object
+    const sortDirection = order === 'asc' || order === '1' ? 1 : -1;
+    const allowedSortFields = ['date', 'createdAt', 'name', 'status', 'slug'];
+    const sortField = allowedSortFields.includes(orderBy) ? orderBy : 'date';
+    const sortObject = { [sortField]: sortDirection };
+
     const webinars = await Webinar.find(query)
       .select(selectFields)
       .populate(populateFields)
-      .sort({ date: -1 })
+      .sort(sortObject)
       .lean();
 
     res.status(200).json({
@@ -506,7 +512,7 @@ export const registerForWebinar = async (req, res) => {
 
     // Format date and time in EST timezone
     const datePart = webinar.date.toLocaleDateString('en-US', { timeZone: 'America/New_York' }); // e.g. "11/11/2025"
-    const timePart = webinar.date.toLocaleTimeString('en-US', { 
+    const timePart = webinar.date.toLocaleTimeString('en-US', {
       timeZone: 'America/New_York',
       hour: 'numeric',
       minute: '2-digit',
