@@ -504,8 +504,14 @@ export const registerForWebinar = async (req, res) => {
     webinar.attendees.push({ user: userId, attendanceStatus: 'registered' });
     await webinar.save();
 
-    const datePart = webinar.date.toLocaleDateString(); // e.g. "11/11/2025"
-    const timePart = webinar.date.toLocaleTimeString(); // e.g. "3:30:00 PM"
+    // Format date and time in EST timezone
+    const datePart = webinar.date.toLocaleDateString('en-US', { timeZone: 'America/New_York' }); // e.g. "11/11/2025"
+    const timePart = webinar.date.toLocaleTimeString('en-US', { 
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }); // e.g. "3:30 PM"
 
     // Send email to user
     const userUrl = `${process.env.CLIENT_URL}/royal-tv/${webinar.slug}/user?is_user=true`;
@@ -516,7 +522,7 @@ export const registerForWebinar = async (req, res) => {
       link: userUrl,
       subject: "Royal Vault Portal - Webinar Registration",
       date: datePart,
-      time: timePart + " GMT",
+      time: timePart + " EST",
       webinarName: webinar.line1,
       description: webinar.line1,
     };
