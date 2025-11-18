@@ -41,7 +41,7 @@ export const getAllWebinars = async (req, res) => {
     const webinars = await Webinar.find(query)
       .select(selectFields)
       .populate(populateFields)
-      .sort({ createdAt: -1 })
+      .sort({ date: -1 })
       .lean();
 
     res.status(200).json({
