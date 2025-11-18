@@ -135,46 +135,29 @@ export const getAllCourseGroups = async (req, res) => {
 export const getCourseGroupById = async (req, res) => {
   try {
     const { fields = 'full' } = req.query;
-
-    const courseGroup = await CourseGroup.findById(req.params.id)
-      .populate('createdBy', 'name email');
-
-    if (!courseGroup) return res.status(404).json({ message: 'CourseGroup not found' });
-
-    // Populate courses and lectures based on fields parameter
-    const courses = await Course.find({ courseGroup: courseGroup._id });
-    const coursesWithLectures = [];
-
-    for (const course of courses) {
-      let lectures = [];
-      if (fields === 'full' && course.lectures) {
-        lectures = await Lecture.find({ _id: { $in: course.lectures } })
-          .select('title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage')
-          .populate('createdBy', 'name email')
-          .populate('completedBy', 'name email')
-          .lean();
-      } else if (fields === 'detailed' && course.lectures) {
-        lectures = await Lecture.find({ _id: { $in: course.lectures } })
-          .select('title description videoUrl relatedFiles displayOnPublicPage')
-          .lean();
-      }
-
-      coursesWithLectures.push({
-        ...course.toObject(),
-        lectures
-      });
+    // 1. Get the CourseGroup
+    const courseGroup = await CourseGroup.findById(req.params.id).lean();
+    if (!courseGroup) {
+      return res.status(404).json({ message: 'CourseGroup not found' });
     }
 
+    // 2. Fetch all courses belonging to this CourseGroup
+    const courses = await Course.find({ courseGroup: courseGroup._id })
+      .lean();
+
+    // 3. Attach courses to the response
     const result = {
-      ...courseGroup.toObject(),
-      courses: coursesWithLectures
+      ...courseGroup,
+      courses
     };
 
     res.json(result);
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // Update CourseGroup
 export const updateCourseGroup = async (req, res) => {
