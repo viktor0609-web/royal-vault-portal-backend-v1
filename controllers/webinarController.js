@@ -234,12 +234,6 @@ export const updateWebinar = async (req, res) => {
       }
     }
 
-    // Automatically set portalDisplay to 'No' when status is 'Ended'
-    let finalPortalDisplay = portalDisplay;
-    if (status === 'Ended') {
-      finalPortalDisplay = 'No';
-    }
-
     const updateData = {
       streamType,
       name,
@@ -250,7 +244,7 @@ export const updateWebinar = async (req, res) => {
       line3,
       status,
       displayComments,
-      portalDisplay: finalPortalDisplay,
+      portalDisplay,
       calInvDesc,
       proWorkId,
       reminderSms,
