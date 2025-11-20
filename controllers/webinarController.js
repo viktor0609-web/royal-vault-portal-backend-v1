@@ -318,6 +318,7 @@ export const endWebinar = async (req, res) => {
 
     // Update webinar status to 'Ended'
     webinar.status = 'Ended';
+    webinar.portalDisplay = 'No';
     await webinar.save();
 
     res.status(200).json({
