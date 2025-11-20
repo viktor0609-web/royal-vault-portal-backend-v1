@@ -163,6 +163,15 @@ const webinarSchema = new Schema({
   timestamps: true,
 });
 
+// Pre-save hook: Automatically set portalDisplay to 'No' when status is 'Ended'
+webinarSchema.pre('save', function (next) {
+  // Only update portalDisplay if status is being changed to 'Ended'
+  if (this.isModified('status') && this.status === 'Ended') {
+    this.portalDisplay = 'No';
+  }
+  next();
+});
+
 // Create the Webinar model
 const Webinar = mongoose.model('Webinar', webinarSchema);
 export default Webinar;
