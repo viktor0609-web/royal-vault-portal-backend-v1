@@ -12,11 +12,13 @@ import categoryRoutes from './categoryRoutes.js'; // Import category routes
 import subCategoryRoutes from './subCategoryRoutes.js'; // Import sub-category routes
 import uploadRoutes from './uploadRoutes.js'; // Import upload routes
 import promotionalSmsListRoutes from './promotionalSmsListRoutes.js'; // Import promotional SMS list routes
+import userRoutes from './userRoutes.js'; // Import user management routes
 
 const router = express.Router();
 
 // Use the routes for different API endpoints
 router.use('/auth', authRoutes);          // All authentication-related routes
+router.use('/users', userRoutes);        // All user management routes
 
 router.use('/webinars', webinarRoutes);  // All webinar-related routes
 router.use('/courses', courseRoutes); // Course-related routes
