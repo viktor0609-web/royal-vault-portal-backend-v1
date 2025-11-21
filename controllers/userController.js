@@ -7,8 +7,17 @@ import mongoose from 'mongoose';
 
 // ======================== USER MANAGEMENT CONTROLLERS ========================
 
+// Helper function to check if user is supaadmin
+const isSupaadmin = (user) => {
+  return user && user.supaadmin === true;
+};
+
 // Get all users with pagination, filtering, and sorting
 export const getAllUsers = async (req, res) => {
+  // Only supaadmin can get all users
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
   try {
     const {
       page = 1,
@@ -137,8 +146,13 @@ export const getUserById = async (req, res) => {
   }
 };
 
-// Create new user (Admin only)
+// Create new user (Supaadmin only)
 export const createUser = async (req, res) => {
+  // Only supaadmin can create users
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -240,11 +254,11 @@ export const createUser = async (req, res) => {
   }
 };
 
-// Update user (Admin can update any, user can update own profile)
+// Update user (Supaadmin can update any, user can update own profile)
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { firstName, lastName, email, phone, role, isVerified } = req.body;
+    const { firstName, lastName, email, phone, role, isVerified, supaadmin } = req.body;
     const currentUser = req.user;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -257,14 +271,14 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check permissions: user can only update own profile (except role and isVerified)
-    if (currentUser.role !== 'admin' && currentUser.id !== userId) {
+    // Check permissions: user can only update own profile (except role, isVerified, and supaadmin)
+    if (!isSupaadmin(currentUser) && currentUser.id !== userId) {
       return res.status(403).json({ message: 'You can only update your own profile' });
     }
 
-    // Only admin can change role and verification status
-    if ((role !== undefined || isVerified !== undefined) && currentUser.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can change role and verification status' });
+    // Only supaadmin can change role, verification status, and supaadmin field
+    if ((role !== undefined || isVerified !== undefined || supaadmin !== undefined) && !isSupaadmin(currentUser)) {
+      return res.status(403).json({ message: 'Only supaadmin can change role, verification status, and supaadmin field' });
     }
 
     // Check if email is being changed and if it's already taken
@@ -280,8 +294,9 @@ export const updateUser = async (req, res) => {
     if (lastName !== undefined) user.lastName = lastName;
     if (email !== undefined) user.email = email;
     if (phone !== undefined) user.phone = phone;
-    if (role !== undefined && currentUser.role === 'admin') user.role = role;
-    if (isVerified !== undefined && currentUser.role === 'admin') user.isVerified = isVerified;
+    if (role !== undefined && isSupaadmin(currentUser)) user.role = role;
+    if (isVerified !== undefined && isSupaadmin(currentUser)) user.isVerified = isVerified;
+    if (supaadmin !== undefined && isSupaadmin(currentUser)) user.supaadmin = supaadmin;
 
     await user.save();
 
@@ -328,8 +343,13 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// Delete user (Admin only)
+// Delete user (Supaadmin only)
 export const deleteUser = async (req, res) => {
+  // Only supaadmin can delete users
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const { userId } = req.params;
 
@@ -356,8 +376,13 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// Reset user password (Admin only)
+// Reset user password (Supaadmin only)
 export const resetUserPassword = async (req, res) => {
+  // Only supaadmin can reset user passwords
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const { userId } = req.params;
     const { newPassword, sendEmail: sendPasswordEmail } = req.body;
@@ -412,8 +437,13 @@ export const resetUserPassword = async (req, res) => {
   }
 };
 
-// Activate/Deactivate user (Admin only)
+// Activate/Deactivate user (Supaadmin only)
 export const toggleUserVerification = async (req, res) => {
+  // Only supaadmin can toggle user verification
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const { userId } = req.params;
     const { isVerified } = req.body;
@@ -444,8 +474,13 @@ export const toggleUserVerification = async (req, res) => {
   }
 };
 
-// Change user role (Admin only)
+// Change user role (Supaadmin only)
 export const changeUserRole = async (req, res) => {
+  // Only supaadmin can change user roles
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const { userId } = req.params;
     const { role } = req.body;
@@ -485,8 +520,13 @@ export const changeUserRole = async (req, res) => {
   }
 };
 
-// Get user statistics (Admin only)
+// Get user statistics (Supaadmin only)
 export const getUserStatistics = async (req, res) => {
+  // Only supaadmin can get user statistics
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const totalUsers = await User.countDocuments();
     const verifiedUsers = await User.countDocuments({ isVerified: true });
@@ -524,8 +564,13 @@ export const getUserStatistics = async (req, res) => {
   }
 };
 
-// Bulk operations (Admin only)
+// Bulk operations (Supaadmin only)
 export const bulkUpdateUsers = async (req, res) => {
+  // Only supaadmin can perform bulk operations
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const { userIds, updates } = req.body;
 
@@ -551,7 +596,7 @@ export const bulkUpdateUsers = async (req, res) => {
     // Build update object (only allow certain fields)
     const allowedFields = ['role', 'isVerified'];
     const updateObj = {};
-    
+
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         updateObj[field] = updates[field];
@@ -579,8 +624,13 @@ export const bulkUpdateUsers = async (req, res) => {
   }
 };
 
-// Bulk delete users (Admin only)
+// Bulk delete users (Supaadmin only)
 export const bulkDeleteUsers = async (req, res) => {
+  // Only supaadmin can perform bulk delete
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can manage users' });
+  }
+
   try {
     const { userIds } = req.body;
 

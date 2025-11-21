@@ -24,3 +24,12 @@ export const authorize = (...roles) => {
     next();
   };
 };
+
+export const authorizeSupaadmin = () => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.supaadmin) {
+      return res.status(403).json({ message: 'Forbidden: Only supaadmin can perform this action' });
+    }
+    next();
+  };
+};
