@@ -71,14 +71,37 @@ export const getAllDeals = async (req, res) => {
       ];
     }
 
-    // Define sort order: asc = 1, desc = -1
-    const sortOrder = order === 'desc' ? -1 : 1;
-
-    // Fetch and sort alphabetically by the 'sortBy' field
+    // Fetch all deals with populated fields
     const deals = await Deal.find()
       .populate(populateFields)
-      .sort({ [sortBy]: sortOrder })
       .lean();
+
+    // Sort deals: Royal Sourced first, then Client Sourced, then by name within each group
+    deals.sort((a, b) => {
+      // Get source names (handle null/undefined sources)
+      const sourceA = a.source?.name || '';
+      const sourceB = b.source?.name || '';
+
+      // Define source priority: Royal Sourced = 0, Client Sourced = 1, others = 2
+      const getSourcePriority = (sourceName) => {
+        if (sourceName === 'Royal Sourced') return 0;
+        if (sourceName === 'Client Sourced') return 1;
+        return 2;
+      };
+
+      const priorityA = getSourcePriority(sourceA);
+      const priorityB = getSourcePriority(sourceB);
+
+      // First sort by source priority
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // If same source priority, sort by name
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
 
     return res
       .status(200)
