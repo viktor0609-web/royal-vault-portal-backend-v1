@@ -12,49 +12,49 @@ import {
   bulkUpdateUsers,
   bulkDeleteUsers,
 } from '../controllers/userController.js';
-import { protect, authorize } from '../middleware/authMiddleware.js';
+import { protect, authorize, authorizeSupaadmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
 
-// Statistics route (Admin only)
-router.get('/statistics', authorize('admin'), getUserStatistics);
+// Statistics route (Supaadmin only)
+router.get('/statistics', authorizeSupaadmin(), getUserStatistics);
 
-// Get all users with pagination, filtering, and sorting (Admin only)
-router.get('/', authorize('admin'), getAllUsers);
+// Get all users with pagination, filtering, and sorting (Supaadmin only)
+router.get('/', authorizeSupaadmin(), getAllUsers);
 
-// Get user by ID (Admin can get any, user can get own)
+// Get user by ID (Supaadmin can get any, user can get own)
 router.get('/:userId', (req, res, next) => {
-  // Allow users to get their own profile
-  if (req.user.id === req.params.userId || req.user.role === 'admin') {
+  // Allow users to get their own profile, or supaadmin to get any
+  if (req.user.id === req.params.userId || (req.user && req.user.supaadmin === true)) {
     return getUserById(req, res, next);
   }
   return res.status(403).json({ message: 'Forbidden: insufficient rights' });
 });
 
-// Create new user (Admin only)
-router.post('/', authorize('admin'), createUser);
+// Create new user (Supaadmin only)
+router.post('/', authorizeSupaadmin(), createUser);
 
-// Update user (Admin can update any, user can update own)
+// Update user (Supaadmin can update any, user can update own)
 router.put('/:userId', updateUser);
 
-// Delete user (Admin only)
-router.delete('/:userId', authorize('admin'), deleteUser);
+// Delete user (Supaadmin only)
+router.delete('/:userId', authorizeSupaadmin(), deleteUser);
 
-// Reset user password (Admin only)
-router.post('/:userId/reset-password', authorize('admin'), resetUserPassword);
+// Reset user password (Supaadmin only)
+router.post('/:userId/reset-password', authorizeSupaadmin(), resetUserPassword);
 
-// Toggle user verification status (Admin only)
-router.patch('/:userId/verification', authorize('admin'), toggleUserVerification);
+// Toggle user verification status (Supaadmin only)
+router.patch('/:userId/verification', authorizeSupaadmin(), toggleUserVerification);
 
-// Change user role (Admin only)
-router.patch('/:userId/role', authorize('admin'), changeUserRole);
+// Change user role (Supaadmin only)
+router.patch('/:userId/role', authorizeSupaadmin(), changeUserRole);
 
-// Bulk operations (Admin only)
-router.post('/bulk/update', authorize('admin'), bulkUpdateUsers);
-router.post('/bulk/delete', authorize('admin'), bulkDeleteUsers);
+// Bulk operations (Supaadmin only)
+router.post('/bulk/update', authorizeSupaadmin(), bulkUpdateUsers);
+router.post('/bulk/delete', authorizeSupaadmin(), bulkDeleteUsers);
 
 export default router;
 

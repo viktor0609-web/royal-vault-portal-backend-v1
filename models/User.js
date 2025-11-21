@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   password: { type: String, required: true },
   role: { type: String, enum: ["user", "admin"], default: "user" },
+  supaadmin: { type: Boolean, default: false },
   refreshToken: { type: String, default: null },
   isVerified: { type: Boolean, default: false },
   verificationToken: { type: String },
