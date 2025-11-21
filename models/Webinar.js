@@ -163,14 +163,27 @@ const webinarSchema = new Schema({
   timestamps: true,
 });
 
-// Pre-save hook: Automatically set portalDisplay to 'No' when status is changed to 'Ended'
-webinarSchema.pre('save', async function (next) {
-  if (this.isModified('status') && this.status === 'Ended') {
-    // Set portalDisplay to 'No' if status is 'Ended' (new or updated document)
-    this.portalDisplay = 'No';
+// Pre-update hook: Automatically set portalDisplay to 'No' when status is changed to 'Ended'
+webinarSchema.pre('findOneAndUpdate', function (next) {
+  const update = this.getUpdate();
+
+  // Handle both direct updates and $set updates
+  const newStatus =
+    update.status ||
+    (update.$set && update.$set.status);
+
+  if (newStatus === 'Ended') {
+    // Apply update
+    if (update.$set) {
+      update.$set.portalDisplay = 'No';
+    } else {
+      update.portalDisplay = 'No';
+    }
   }
+
   next();
 });
+
 
 
 // Create the Webinar model
