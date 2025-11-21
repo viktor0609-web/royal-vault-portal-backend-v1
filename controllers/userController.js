@@ -57,9 +57,11 @@ export const getAllUsers = async (req, res) => {
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    // Define sort order
+    // Define sort order with validation
     const sortOrder = order === 'desc' ? -1 : 1;
-    const sortObj = { [sortBy]: sortOrder };
+    const allowedSortFields = ['createdAt', 'firstName', 'lastName', 'email', 'phone', 'role', 'isVerified'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sortObj = { [sortField]: sortOrder };
 
     // Get total count for pagination
     const total = await User.countDocuments(filter);
@@ -157,7 +159,7 @@ export const createUser = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { firstName, lastName, email, phone, role, sendVerificationEmail } = req.body;
+    const { firstName, lastName, email, phone, role, sendVerificationEmail, createHubSpotContact } = req.body;
 
     // Validation
     if (!firstName || !lastName || !email || !phone) {
@@ -191,29 +193,31 @@ export const createUser = async (req, res) => {
       { session }
     );
 
-    // Create HubSpot contact
-    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
-    if (HUBSPOT_PRIVATE_API_KEY) {
-      try {
-        const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
-        const hubSpotContact = {
-          properties: {
-            email: user.email,
-            firstname: user.firstName,
-            lastname: user.lastName,
-            phone: user.phone,
-          },
-        };
+    // Create HubSpot contact (only if requested)
+    if (createHubSpotContact !== false) {
+      const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+      if (HUBSPOT_PRIVATE_API_KEY) {
+        try {
+          const HUBSPOT_API_URL = "https://api.hubapi.com/crm/v3/objects/contacts";
+          const hubSpotContact = {
+            properties: {
+              email: user.email,
+              firstname: user.firstName,
+              lastname: user.lastName,
+              phone: user.phone,
+            },
+          };
 
-        await axios.post(HUBSPOT_API_URL, hubSpotContact, {
-          headers: {
-            Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (hubspotError) {
-        console.log("HubSpot creation error:", hubspotError.response?.data || hubspotError.message);
-        // Continue even if HubSpot fails
+          await axios.post(HUBSPOT_API_URL, hubSpotContact, {
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          });
+        } catch (hubspotError) {
+          console.log("HubSpot creation error:", hubspotError.response?.data || hubspotError.message);
+          // Continue even if HubSpot fails
+        }
       }
     }
 
