@@ -134,7 +134,7 @@ export const getAllCourseGroups = async (req, res) => {
 // Get single CourseGroup by ID - OPTIMIZED VERSION
 export const getCourseGroupById = async (req, res) => {
   try {
-    const { fields = 'full' } = req.query;
+    const { fields = 'detailed' } = req.query;
     // 1. Get the CourseGroup
     const courseGroup = await CourseGroup.findById(req.params.id).lean();
     if (!courseGroup) {
@@ -142,7 +142,7 @@ export const getCourseGroupById = async (req, res) => {
     }
 
     // 2. Fetch all courses belonging to this CourseGroup
-    const courses = await Course.find({ courseGroup: courseGroup._id })
+    const courses = await Course.find({ courseGroup: courseGroup._id }).populate('lectures')
       .lean();
 
     // 3. Attach courses to the response
