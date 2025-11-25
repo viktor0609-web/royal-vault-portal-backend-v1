@@ -1,5 +1,16 @@
+import mongoose from 'mongoose';
 import { CourseGroup, Course, Lecture } from '../models/Course.js';
 import User from '../models/User.js';
+
+// Helper function to build $project stage from field string
+const buildProjectStage = (fieldsString) => {
+  const fields = fieldsString.split(' ').filter(f => f.length > 0);
+  const project = {};
+  fields.forEach(field => {
+    project[field] = 1;
+  });
+  return project;
+};
 
 // ------------------ CourseGroup CRUD ------------------
 
@@ -30,101 +41,187 @@ export const createCourseGroup = async (req, res) => {
 // Get all CourseGroups with courses and lectures - OPTIMIZED VERSION
 export const getAllCourseGroups = async (req, res) => {
   try {
-    const { type, search, fields = 'basic' } = req.query;
-    let query = {};
+    const { type, search, fields = 'basic', page = 1, limit = 50, publicOnly = 'false' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    const isPublicOnly = publicOnly === 'true';
 
-    // Build query based on type filter
+    // Build base query based on type filter
+    let matchStage = {};
+
     if (type === 'courses') {
-      query = { _id: { $in: await Course.distinct('courseGroup') } };
+      const courseGroupIds = await Course.distinct('courseGroup');
+      matchStage = { _id: { $in: courseGroupIds } };
     } else if (type === 'bundles') {
       const courseCounts = await Course.aggregate([
         { $group: { _id: '$courseGroup', count: { $sum: 1 } } },
         { $match: { count: { $gte: 2 } } }
       ]);
-      query = { _id: { $in: courseCounts.map(c => c._id) } };
+      matchStage = { _id: { $in: courseCounts.map(c => c._id) } };
     } else if (type === 'content') {
-      const courseGroupsWithLectures = await Course.distinct('courseGroup', {
-        _id: { $in: await Lecture.distinct('course') }
+      // Fixed: Get courses that have lectures, then get their courseGroups
+      const coursesWithLectures = await Course.distinct('courseGroup', {
+        lectures: { $exists: true, $ne: [] }
       });
-      query = { _id: { $in: courseGroupsWithLectures } };
+      matchStage = { _id: { $in: coursesWithLectures } };
     }
 
-    // Define field selection based on query parameter
-    let populateFields = 'createdBy';
-    if (fields === 'basic') {
-      populateFields = { path: 'createdBy', select: 'name email' };
-    } else if (fields === 'detailed') {
-      populateFields = { path: 'createdBy', select: 'name email' };
-    }
-
-    let courseGroups = await CourseGroup.find(query)
-      .populate(populateFields)
-      .lean();
-
-    // Apply search filter if provided
+    // Add search filter to match stage if provided
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      const searchResults = [];
+      matchStage.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
 
-      for (const group of courseGroups) {
-        let includeGroup = false;
-
-        if (searchRegex.test(group.title) || searchRegex.test(group.description)) {
-          includeGroup = true;
+    // Build aggregation pipeline
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+          pipeline: [{ $project: { name: 1, email: 1 } }]
         }
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
+    ];
 
-        if (fields === 'detailed' || fields === 'full') {
-          const courses = await Course.find({ courseGroup: group._id })
-            .populate('lectures', fields === 'full' ? 'title description content videoUrl relatedFiles createdBy createdAt' : 'title description')
-            .lean();
+    // Add courses lookup based on fields parameter
+    if (fields === 'detailed' || fields === 'full') {
+      const lectureFields = fields === 'full'
+        ? 'title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage'
+        : 'title description videoUrl displayOnPublicPage';
 
-          for (const course of courses) {
-            if (searchRegex.test(course.title) || searchRegex.test(course.description)) {
-              includeGroup = true;
+      const courseLookup = {
+        $lookup: {
+          from: 'courses',
+          localField: '_id',
+          foreignField: 'courseGroup',
+          as: 'courses',
+          pipeline: [
+            {
+              $lookup: {
+                from: 'lectures',
+                localField: 'lectures',
+                foreignField: '_id',
+                as: 'lectures',
+                pipeline: [
+                  ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
+                  {
+                    $project: buildProjectStage(lectureFields)
+                  },
+                  {
+                    $lookup: {
+                      from: 'users',
+                      localField: 'createdBy',
+                      foreignField: '_id',
+                      as: 'createdBy',
+                      pipeline: [{ $project: { name: 1, email: 1 } }]
+                    }
+                  },
+                  { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
+                ]
+              }
+            },
+            {
+              $project: {
+                title: 1,
+                description: 1,
+                courseGroup: 1,
+                lectures: 1,
+                createdBy: 1,
+                createdAt: 1,
+                updatedAt: 1
+              }
             }
+          ]
+        }
+      };
 
-            if (fields === 'full' && course.lectures) {
-              const lecturesWithSearch = course.lectures.filter(lecture =>
-                searchRegex.test(lecture.title) || searchRegex.test(lecture.description)
-              );
-              if (lecturesWithSearch.length > 0) {
-                includeGroup = true;
+      pipeline.push(courseLookup);
+
+      // If search is provided, filter courses/lectures that match
+      if (search) {
+        pipeline.push({
+          $addFields: {
+            courses: {
+              $filter: {
+                input: '$courses',
+                as: 'course',
+                cond: {
+                  $or: [
+                    { $regexMatch: { input: '$$course.title', regex: search, options: 'i' } },
+                    { $regexMatch: { input: '$$course.description', regex: search, options: 'i' } },
+                    {
+                      $gt: [
+                        {
+                          $size: {
+                            $filter: {
+                              input: '$$course.lectures',
+                              as: 'lecture',
+                              cond: {
+                                $or: [
+                                  { $regexMatch: { input: '$$lecture.title', regex: search, options: 'i' } },
+                                  { $regexMatch: { input: '$$lecture.description', regex: search, options: 'i' } }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  ]
+                }
               }
             }
           }
-
-          group.courses = courses;
-        } else {
-          // For basic view, just get course count
-          const courseCount = await Course.countDocuments({ courseGroup: group._id });
-          group.courses = [{ count: courseCount }];
-        }
-
-        if (includeGroup) {
-          searchResults.push(group);
-        }
+        });
       }
-
-      courseGroups = searchResults;
     } else {
-      // If no search, populate based on fields parameter
-      if (fields === 'detailed' || fields === 'full') {
-        for (const group of courseGroups) {
-          const courses = await Course.find({ courseGroup: group._id })
-            .populate('lectures', fields === 'full' ? 'title description content videoUrl relatedFiles createdBy createdAt' : 'title description')
-            .lean();
-          group.courses = courses;
+      // For basic view, just get course count
+      pipeline.push({
+        $lookup: {
+          from: 'courses',
+          localField: '_id',
+          foreignField: 'courseGroup',
+          as: 'courseCount',
+          pipeline: [{ $count: 'count' }]
         }
-      } else {
-        // For basic view, just get course counts
-        for (const group of courseGroups) {
-          const courseCount = await Course.countDocuments({ courseGroup: group._id });
-          group.courses = [{ count: courseCount }];
+      });
+      pipeline.push({
+        $addFields: {
+          courses: [{ count: { $ifNull: [{ $arrayElemAt: ['$courseCount.count', 0] }, 0] } }]
         }
-      }
+      });
+      pipeline.push({ $project: { courseCount: 0 } });
     }
 
-    res.json(courseGroups);
+    // Add pagination
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limitNum });
+
+    // Execute aggregation
+    const courseGroups = await CourseGroup.aggregate(pipeline);
+
+    // Get total count for pagination
+    const countPipeline = [{ $match: matchStage }, { $count: 'total' }];
+    const countResult = await CourseGroup.aggregate(countPipeline);
+    const total = countResult[0]?.total || 0;
+
+    res.json({
+      data: courseGroups,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: error.message });
@@ -134,26 +231,86 @@ export const getAllCourseGroups = async (req, res) => {
 // Get single CourseGroup by ID - OPTIMIZED VERSION
 export const getCourseGroupById = async (req, res) => {
   try {
-    const { fields = 'detailed' } = req.query;
-    // 1. Get the CourseGroup
-    const courseGroup = await CourseGroup.findById(req.params.id).lean();
-    if (!courseGroup) {
+    const { fields = 'detailed', publicOnly = 'false' } = req.query;
+    const isPublicOnly = publicOnly === 'true';
+
+    // Use aggregation for better performance
+    const pipeline = [
+      { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+          pipeline: [{ $project: { name: 1, email: 1 } }]
+        }
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Add courses lookup
+    const lectureFields = fields === 'full'
+      ? 'title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage'
+      : 'title description videoUrl displayOnPublicPage';
+
+    pipeline.push({
+      $lookup: {
+        from: 'courses',
+        localField: '_id',
+        foreignField: 'courseGroup',
+        as: 'courses',
+        pipeline: [
+          {
+            $lookup: {
+              from: 'lectures',
+              localField: 'lectures',
+              foreignField: '_id',
+              as: 'lectures',
+              pipeline: [
+                ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
+                {
+                  $project: buildProjectStage(lectureFields)
+                },
+                {
+                  $lookup: {
+                    from: 'users',
+                    localField: 'createdBy',
+                    foreignField: '_id',
+                    as: 'createdBy',
+                    pipeline: [{ $project: { name: 1, email: 1 } }]
+                  }
+                },
+                { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
+              ]
+            }
+          },
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              courseGroup: 1,
+              lectures: 1,
+              createdBy: 1,
+              createdAt: 1,
+              updatedAt: 1
+            }
+          }
+        ]
+      }
+    });
+
+    const result = await CourseGroup.aggregate(pipeline);
+
+    if (!result || result.length === 0) {
       return res.status(404).json({ message: 'CourseGroup not found' });
     }
 
-    // 2. Fetch all courses belonging to this CourseGroup
-    const courses = await Course.find({ courseGroup: courseGroup._id }).populate('lectures')
-      .lean();
-
-    // 3. Attach courses to the response
-    const result = {
-      ...courseGroup,
-      courses
-    };
-
-    res.json(result);
-
+    res.json(result[0]);
   } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(404).json({ message: 'CourseGroup not found' });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -256,32 +413,94 @@ export const createCourse = async (req, res) => {
 // Get all Courses - OPTIMIZED VERSION
 export const getAllCourses = async (req, res) => {
   try {
-    const { fields = 'basic' } = req.query;
+    const { fields = 'basic', page = 1, limit = 50, publicOnly = 'false', courseGroup } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    const isPublicOnly = publicOnly === 'true';
 
-    let populateFields = [];
-    if (fields === 'basic') {
-      populateFields = [
-        { path: 'createdBy', select: 'name email' },
-        { path: 'courseGroup', select: 'title description icon' }
-      ];
-    } else if (fields === 'detailed') {
-      populateFields = [
-        { path: 'createdBy', select: 'name email' },
-        { path: 'courseGroup', select: 'title description icon' },
-        { path: 'lectures', select: 'title description videoUrl' }
-      ];
-    } else if (fields === 'full') {
-      populateFields = [
-        { path: 'createdBy', select: 'name email' },
-        { path: 'courseGroup', select: 'title description icon' },
-        { path: 'lectures', select: 'title description content videoUrl relatedFiles createdBy createdAt completedBy' }
-      ];
+    // Build match query
+    const matchQuery = {};
+    if (courseGroup) {
+      matchQuery.courseGroup = courseGroup;
     }
 
-    const courses = await Course.find()
-      .populate(populateFields)
-      .lean();
-    res.json(courses);
+    // Build aggregation pipeline
+    const pipeline = [
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+          pipeline: [{ $project: { name: 1, email: 1 } }]
+        }
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'coursegroups',
+          localField: 'courseGroup',
+          foreignField: '_id',
+          as: 'courseGroup',
+          pipeline: [{ $project: { title: 1, description: 1, icon: 1 } }]
+        }
+      },
+      { $unwind: { path: '$courseGroup', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Add lectures lookup if needed
+    if (fields === 'detailed' || fields === 'full') {
+      const lectureFields = fields === 'full'
+        ? 'title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage'
+        : 'title description videoUrl displayOnPublicPage';
+
+      pipeline.push({
+        $lookup: {
+          from: 'lectures',
+          localField: 'lectures',
+          foreignField: '_id',
+          as: 'lectures',
+          pipeline: [
+            ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
+            {
+              $project: buildProjectStage(lectureFields)
+            },
+            ...(fields === 'full' ? [{
+              $lookup: {
+                from: 'users',
+                localField: 'createdBy',
+                foreignField: '_id',
+                as: 'createdBy',
+                pipeline: [{ $project: { name: 1, email: 1 } }]
+              }
+            }, { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }] : [])
+          ]
+        }
+      });
+    }
+
+    // Get total count
+    const countPipeline = [{ $match: matchQuery }, { $count: 'total' }];
+    const countResult = await Course.aggregate(countPipeline);
+    const total = countResult[0]?.total || 0;
+
+    // Add pagination
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limitNum });
+
+    const courses = await Course.aggregate(pipeline);
+
+    res.json({
+      data: courses,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -290,28 +509,76 @@ export const getAllCourses = async (req, res) => {
 // Get Course by ID - OPTIMIZED VERSION
 export const getCourseById = async (req, res) => {
   try {
-    const { fields = 'full' } = req.query;
+    const { fields = 'full', publicOnly = 'false' } = req.query;
+    const isPublicOnly = publicOnly === 'true';
 
-    let populateFields = [
-      { path: 'createdBy', select: 'name email' },
-      { path: 'courseGroup', select: 'title description icon' }
+    // Use aggregation for better performance and filtering
+    const pipeline = [
+      { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+          pipeline: [{ $project: { name: 1, email: 1 } }]
+        }
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'coursegroups',
+          localField: 'courseGroup',
+          foreignField: '_id',
+          as: 'courseGroup',
+          pipeline: [{ $project: { title: 1, description: 1, icon: 1 } }]
+        }
+      },
+      { $unwind: { path: '$courseGroup', preserveNullAndEmptyArrays: true } }
     ];
 
-    if (fields === 'full') {
-      populateFields.push({ path: 'lectures', select: 'title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage' });
-    } else if (fields === 'detailed') {
-      populateFields.push({ path: 'lectures', select: 'title description videoUrl relatedFiles displayOnPublicPage' });
-    } else if (fields === 'basic') {
-      populateFields.push({ path: 'lectures', select: 'title description displayOnPublicPage' });
+    // Add lectures lookup
+    const lectureFields = fields === 'full'
+      ? 'title description content videoUrl relatedFiles createdBy createdAt completedBy displayOnPublicPage'
+      : fields === 'detailed'
+        ? 'title description videoUrl relatedFiles displayOnPublicPage'
+        : 'title description displayOnPublicPage';
+
+    pipeline.push({
+      $lookup: {
+        from: 'lectures',
+        localField: 'lectures',
+        foreignField: '_id',
+        as: 'lectures',
+        pipeline: [
+          ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
+          {
+            $project: buildProjectStage(lectureFields)
+          },
+          ...(fields === 'full' ? [{
+            $lookup: {
+              from: 'users',
+              localField: 'createdBy',
+              foreignField: '_id',
+              as: 'createdBy',
+              pipeline: [{ $project: { name: 1, email: 1 } }]
+            }
+          }, { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }] : [])
+        ]
+      }
+    });
+
+    const result = await Course.aggregate(pipeline);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ message: 'Course not found' });
     }
 
-    const course = await Course.findById(req.params.id)
-      .populate(populateFields);
-
-    if (!course) return res.status(404).json({ message: 'Course not found' });
-
-    res.json(course);
+    res.json(result[0]);
   } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(404).json({ message: 'Course not found' });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -431,11 +698,71 @@ export const createLecture = async (req, res) => {
 // Get all Lectures
 export const getAllLectures = async (req, res) => {
   try {
-    const lectures = await Lecture.find()
-      .populate('createdBy', 'name email')
-      .populate('completedBy', 'name email')
-      .lean();
-    res.json(lectures);
+    const { page = 1, limit = 50, publicOnly = 'false', courseId } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    const isPublicOnly = publicOnly === 'true';
+
+    // Build match query
+    const matchQuery = {};
+    if (isPublicOnly) {
+      matchQuery.displayOnPublicPage = true;
+    }
+    if (courseId) {
+      // Find courses that contain this lecture
+      const course = await Course.findById(courseId);
+      if (course && course.lectures && course.lectures.length > 0) {
+        matchQuery._id = { $in: course.lectures };
+      } else {
+        matchQuery._id = { $in: [] }; // No lectures found
+      }
+    }
+
+    // Build aggregation pipeline
+    const pipeline = [
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+          pipeline: [{ $project: { name: 1, email: 1 } }]
+        }
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'completedBy',
+          foreignField: '_id',
+          as: 'completedBy',
+          pipeline: [{ $project: { name: 1, email: 1 } }]
+        }
+      }
+    ];
+
+    // Get total count
+    const countPipeline = [{ $match: matchQuery }, { $count: 'total' }];
+    const countResult = await Lecture.aggregate(countPipeline);
+    const total = countResult[0]?.total || 0;
+
+    // Add pagination
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limitNum });
+
+    const lectures = await Lecture.aggregate(pipeline);
+
+    res.json({
+      data: lectures,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
