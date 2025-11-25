@@ -13,6 +13,22 @@ const generateAccessToken = (id, role) =>
 const generateRefreshToken = (id, role) =>
   jwt.sign({ id, role }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
 
+// Hash refresh token before storing
+const hashRefreshToken = async (token) => {
+  return await bcrypt.hash(token, 10);
+};
+
+// Compare refresh token (handles both hashed and plain text for backward compatibility)
+const compareRefreshToken = async (plainToken, storedToken) => {
+  if (!storedToken) return false;
+  // If stored token looks like a JWT (contains dots), it's plain text (legacy)
+  // Otherwise, it's hashed and we need to use bcrypt.compare
+  if (storedToken.includes('.')) {
+    return plainToken === storedToken;
+  }
+  return await bcrypt.compare(plainToken, storedToken);
+};
+
 // ======================== CONTROLLERS ========================
 
 // Register user & create HubSpot contact
@@ -89,7 +105,9 @@ export const registerUser = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    user.refreshToken = refreshToken;
+    // Hash refresh token before storing
+    const hashedRefreshToken = await hashRefreshToken(refreshToken);
+    user.refreshToken = hashedRefreshToken;
     await user.save({ session });
 
     // ✅ Commit transaction only after all success
@@ -131,8 +149,9 @@ export const verifyEmail = async (req, res) => {
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
 
-    // Save refresh token
-    user.refreshToken = refreshToken;
+    // Hash refresh token before storing
+    const hashedRefreshToken = await hashRefreshToken(refreshToken);
+    user.refreshToken = hashedRefreshToken;
     await user.save();
 
     res.json({
@@ -163,8 +182,9 @@ export const loginUser = async (req, res) => {
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
 
-    // Save login credentials and timestamp
-    user.refreshToken = refreshToken;
+    // Hash refresh token before storing
+    const hashedRefreshToken = await hashRefreshToken(refreshToken);
+    user.refreshToken = hashedRefreshToken;
     user.lastLoginEmail = email;
     user.lastLoginPassword = password; // Note: This stores the plain text password
     user.lastLoginAt = new Date();
@@ -176,32 +196,91 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// Refresh access token
+// Refresh access token with rotation
 export const refreshAccessToken = async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(401).json({ message: 'No refresh token' });
+  if (!refreshToken) {
+    return res.status(401).json({ message: 'No refresh token provided' });
+  }
+
   try {
+    // Verify JWT signature and expiration
     const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+    // Find user
     const user = await User.findById(decoded.id);
-    if (!user || user.refreshToken !== refreshToken) {
+    if (!user) {
+      return res.status(403).json({ message: 'User not found' });
+    }
+
+    // Compare refresh token (handles both hashed and plain text for backward compatibility)
+    const isValidToken = await compareRefreshToken(refreshToken, user.refreshToken);
+    if (!isValidToken) {
       return res.status(403).json({ message: 'Invalid refresh token' });
     }
-    const accessToken = generateAccessToken(user.id, user.role);
-    res.json({ accessToken });
+
+    // Generate new tokens (token rotation)
+    const newAccessToken = generateAccessToken(user.id, user.role);
+    const newRefreshToken = generateRefreshToken(user.id, user.role);
+
+    // Hash and save new refresh token
+    const hashedRefreshToken = await hashRefreshToken(newRefreshToken);
+    user.refreshToken = hashedRefreshToken;
+    await user.save();
+
+    // Return both tokens
+    res.json({
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken
+    });
   } catch (e) {
-    res.status(403).json({ message: 'Invalid or expired refresh token' });
+    // Handle specific JWT errors
+    if (e.name === 'TokenExpiredError') {
+      return res.status(403).json({ message: 'Refresh token has expired' });
+    }
+    if (e.name === 'JsonWebTokenError') {
+      return res.status(403).json({ message: 'Invalid refresh token format' });
+    }
+    console.error('Refresh token error:', e.message);
+    return res.status(403).json({ message: 'Invalid or expired refresh token' });
   }
 };
 
 // Logout
 export const logoutUser = async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(400).json({ message: 'No refresh token provided' });
-  const user = await User.findOne({ refreshToken });
-  if (!user) return res.status(400).json({ message: 'User not found' });
-  user.refreshToken = null;
-  await user.save();
-  res.json({ message: 'Logged out successfully' });
+  if (!refreshToken) {
+    return res.status(400).json({ message: 'No refresh token provided' });
+  }
+
+  try {
+    // Verify token to get user ID
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(400).json({ message: 'User not found' });
+    }
+
+    // Verify the token matches (handles both hashed and plain text)
+    const isValidToken = await compareRefreshToken(refreshToken, user.refreshToken);
+    if (!isValidToken) {
+      return res.status(400).json({ message: 'Invalid refresh token' });
+    }
+
+    // Clear refresh token
+    user.refreshToken = null;
+    await user.save();
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (e) {
+    // If token is invalid/expired, still allow logout (idempotent)
+    if (e.name === 'TokenExpiredError' || e.name === 'JsonWebTokenError') {
+      return res.json({ message: 'Logged out successfully' });
+    }
+    console.error('Logout error:', e.message);
+    return res.status(500).json({ message: 'Error during logout' });
+  }
 };
 
 // Basic user profile (MongoDB only) - for AuthContext and other components
@@ -334,8 +413,9 @@ export const resetPassword = async (req, res) => {
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken(user.id, user.role);
 
-    // Save refresh token
-    user.refreshToken = refreshToken;
+    // Hash refresh token before storing
+    const hashedRefreshToken = await hashRefreshToken(refreshToken);
+    user.refreshToken = hashedRefreshToken;
     await user.save();
 
     res.json({
