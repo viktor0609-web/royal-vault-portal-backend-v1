@@ -21,6 +21,8 @@ const courseSchema = new Schema(
     courseGroup: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseGroup', required: true },
     lectures: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lecture' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    ebookName: { type: String, default: '' }, // Ebook display name
+    ebookUrl: { type: String, default: '' }, // Ebook file URL
   },
   { timestamps: true }
 );

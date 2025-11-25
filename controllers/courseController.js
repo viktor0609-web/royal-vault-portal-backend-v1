@@ -293,7 +293,9 @@ export const getCourseGroupById = async (req, res) => {
               lectures: 1,
               createdBy: 1,
               createdAt: 1,
-              updatedAt: 1
+              updatedAt: 1,
+              ebookName: 1,
+              ebookUrl: 1
             }
           }
         ]
@@ -374,7 +376,7 @@ export const deleteCourseGroup = async (req, res) => {
 // Create a new Course
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, lectures = [] } = req.body;
+    const { title, description, lectures = [], ebookName = '', ebookUrl = '' } = req.body;
     const courseGroup = req.params.groupId;
     const createdBy = req.user._id;
 
@@ -394,7 +396,9 @@ export const createCourse = async (req, res) => {
       description,
       courseGroup,
       lectures,
-      createdBy
+      createdBy,
+      ebookName,
+      ebookUrl
     });
 
     await course.populate('createdBy', 'name email');
