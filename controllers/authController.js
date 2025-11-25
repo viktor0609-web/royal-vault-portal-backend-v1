@@ -153,7 +153,7 @@ export const loginUser = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'You are not registered yet. Please register first.' });
     if (!user.isVerified) {
       // return res.status(403).json({ message: 'Please verify your email before logging in.' });
-      return res.status(403).json({ message: 'Please reset your email password before logging in. This was required due to the recent data migration.' });
+      return res.status(403).json({ message: 'Please reset your email password before log in' });
     }
 
 
