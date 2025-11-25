@@ -43,6 +43,19 @@ const lectureSchema = new Schema(
   { timestamps: true }
 );
 
+// Add indexes for performance optimization
+courseGroupSchema.index({ createdBy: 1 });
+courseGroupSchema.index({ title: 'text', description: 'text' }); // Text search index
+
+courseSchema.index({ courseGroup: 1 }); // Critical: used in many queries
+courseSchema.index({ createdBy: 1 });
+courseSchema.index({ title: 'text', description: 'text' }); // Text search index
+
+lectureSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
+lectureSchema.index({ createdBy: 1 });
+lectureSchema.index({ completedBy: 1 }); // For array queries
+lectureSchema.index({ title: 'text', description: 'text' }); // Text search index
+
 // Add pre-save middleware to validate related files
 lectureSchema.pre('save', function(next) {
   // Validate related files
