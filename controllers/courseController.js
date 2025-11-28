@@ -25,7 +25,13 @@ export const createCourseGroup = async (req, res) => {
     }
 
     const createdBy = req.user._id;
-    const courseGroup = await CourseGroup.create({ title, description, icon, createdBy });
+    const courseGroup = await CourseGroup.create({ 
+      title, 
+      description, 
+      icon, 
+      createdBy,
+      displayOnPublicPage: req.body.displayOnPublicPage || false
+    });
     await courseGroup.populate('createdBy', 'name email');
 
     res.status(201).json(courseGroup);
@@ -73,6 +79,11 @@ export const getAllCourseGroups = async (req, res) => {
         { title: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ];
+    }
+
+    // Add public pages filter if needed
+    if (isPublicOnly) {
+      matchStage.displayOnPublicPage = true;
     }
 
     // Build aggregation pipeline
@@ -127,6 +138,7 @@ export const getAllCourseGroups = async (req, res) => {
                 ]
               }
             },
+            ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
             {
               $project: {
                 title: 1,
@@ -135,7 +147,9 @@ export const getAllCourseGroups = async (req, res) => {
                 lectures: 1,
                 createdBy: 1,
                 createdAt: 1,
-                updatedAt: 1
+                updatedAt: 1,
+                resources: 1,
+                displayOnPublicPage: 1
               }
             }
           ]
@@ -421,7 +435,8 @@ export const createCourse = async (req, res) => {
       resources: finalResources,
       // Keep legacy fields for backward compatibility
       ebookName,
-      ebookUrl
+      ebookUrl,
+      displayOnPublicPage: req.body.displayOnPublicPage || false
     });
 
     await course.populate('createdBy', 'name email');
@@ -450,6 +465,9 @@ export const getAllCourses = async (req, res) => {
     const matchQuery = {};
     if (courseGroup) {
       matchQuery.courseGroup = courseGroup;
+    }
+    if (isPublicOnly) {
+      matchQuery.displayOnPublicPage = true;
     }
 
     // Build aggregation pipeline
