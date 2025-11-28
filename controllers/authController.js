@@ -8,7 +8,7 @@ import mongoose from 'mongoose';
 
 // Generate JWT token
 const generateAccessToken = (id, role) =>
-  jwt.sign({ id, role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '90m' });
+  jwt.sign({ id, role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7d' });
 
 // ======================== CONTROLLERS ========================
 
