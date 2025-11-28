@@ -294,6 +294,7 @@ export const getCourseGroupById = async (req, res) => {
               createdBy: 1,
               createdAt: 1,
               updatedAt: 1,
+              resources: 1,
               ebookName: 1,
               ebookUrl: 1
             }
@@ -376,7 +377,7 @@ export const deleteCourseGroup = async (req, res) => {
 // Create a new Course
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, lectures = [], ebookName = '', ebookUrl = '' } = req.body;
+    const { title, description, lectures = [], resources = [], ebookName = '', ebookUrl = '' } = req.body;
     const courseGroup = req.params.groupId;
     const createdBy = req.user._id;
 
@@ -385,10 +386,30 @@ export const createCourse = async (req, res) => {
       return res.status(400).json({ message: 'Title and description are required' });
     }
 
+    // Validate resources if provided
+    if (resources && Array.isArray(resources)) {
+      for (let i = 0; i < resources.length; i++) {
+        const resource = resources[i];
+        if (!resource.name || !resource.url) {
+          return res.status(400).json({ message: `Resource ${i + 1} must have both name and url` });
+        }
+      }
+    }
+
     // Check if course group exists
     const group = await CourseGroup.findById(courseGroup);
     if (!group) {
       return res.status(404).json({ message: 'Course group not found' });
+    }
+
+    // Migrate legacy ebook fields to resources if provided
+    let finalResources = resources || [];
+    if (ebookName && ebookUrl && (!resources || resources.length === 0)) {
+      finalResources = [{
+        name: ebookName,
+        url: ebookUrl,
+        type: 'ebook'
+      }];
     }
 
     const course = await Course.create({
@@ -397,6 +418,8 @@ export const createCourse = async (req, res) => {
       courseGroup,
       lectures,
       createdBy,
+      resources: finalResources,
+      // Keep legacy fields for backward compatibility
       ebookName,
       ebookUrl
     });

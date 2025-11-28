@@ -21,8 +21,14 @@ const courseSchema = new Schema(
     courseGroup: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseGroup', required: true },
     lectures: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lecture' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    ebookName: { type: String, default: '' }, // Ebook display name
-    ebookUrl: { type: String, default: '' }, // Ebook file URL
+    resources: [{
+      name: { type: String, required: true }, // Resource display name
+      url: { type: String, required: true }, // Resource URL or file URL
+      type: { type: String, enum: ['ebook', 'pdf', 'spreadsheet', 'url', 'other'], default: 'other' } // Resource type
+    }],
+    // Legacy fields for backward compatibility (deprecated)
+    ebookName: { type: String, default: '' },
+    ebookUrl: { type: String, default: '' },
   },
   { timestamps: true }
 );
