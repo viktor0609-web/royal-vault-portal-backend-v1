@@ -3,7 +3,6 @@ import {
   registerUser,
   verifyEmail,
   loginUser,
-  refreshAccessToken,
   logoutUser,
   getUser,
   getProfile,
@@ -18,7 +17,6 @@ const router = express.Router();
 router.post('/register', registerUser);
 router.post('/verify/:token', verifyEmail);
 router.post('/login', loginUser);
-router.post('/refresh', refreshAccessToken);
 router.post('/logout', logoutUser);
 
 router.post('/forgot-password', forgotPassword);

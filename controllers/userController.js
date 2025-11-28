@@ -68,7 +68,7 @@ export const getAllUsers = async (req, res) => {
 
     // Fetch users
     const users = await User.find(filter)
-      .select('-password -refreshToken -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
+      .select('-password -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
       .sort(sortObj)
       .skip(skip)
       .limit(limitNum)
@@ -100,7 +100,7 @@ export const getUserById = async (req, res) => {
     }
 
     const user = await User.findById(userId)
-      .select('-password -refreshToken -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
+      .select('-password -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
       .lean();
 
     if (!user) {
@@ -243,7 +243,7 @@ export const createUser = async (req, res) => {
     session.endSession();
 
     const userResponse = await User.findById(user._id)
-      .select('-password -refreshToken -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
+      .select('-password -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
       .lean();
 
     return res.status(201).json({
@@ -334,7 +334,7 @@ export const updateUser = async (req, res) => {
     }
 
     const updatedUser = await User.findById(userId)
-      .select('-password -refreshToken -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
+      .select('-password -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
       .lean();
 
     return res.status(200).json({
@@ -465,7 +465,7 @@ export const toggleUserVerification = async (req, res) => {
     await user.save();
 
     const updatedUser = await User.findById(userId)
-      .select('-password -refreshToken -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
+      .select('-password -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
       .lean();
 
     return res.status(200).json({
@@ -511,7 +511,7 @@ export const changeUserRole = async (req, res) => {
     await user.save();
 
     const updatedUser = await User.findById(userId)
-      .select('-password -refreshToken -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
+      .select('-password -verificationToken -resetPasswordToken -resetPasswordExpire -lastLoginEmail -lastLoginPassword')
       .lean();
 
     return res.status(200).json({
