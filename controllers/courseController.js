@@ -248,9 +248,15 @@ export const getCourseGroupById = async (req, res) => {
     const { fields = 'detailed', publicOnly = 'false' } = req.query;
     const isPublicOnly = publicOnly === 'true';
 
+    // Build match stage - check displayOnPublicPage if publicOnly is true
+    const matchStage = { _id: new mongoose.Types.ObjectId(req.params.id) };
+    if (isPublicOnly) {
+      matchStage.displayOnPublicPage = true;
+    }
+
     // Use aggregation for better performance
     const pipeline = [
-      { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+      { $match: matchStage },
       {
         $lookup: {
           from: 'users',
@@ -299,6 +305,7 @@ export const getCourseGroupById = async (req, res) => {
               ]
             }
           },
+          ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
           {
             $project: {
               title: 1,
@@ -309,6 +316,7 @@ export const getCourseGroupById = async (req, res) => {
               createdAt: 1,
               updatedAt: 1,
               resources: 1,
+              displayOnPublicPage: 1,
               ebookName: 1,
               ebookUrl: 1
             }
@@ -557,9 +565,15 @@ export const getCourseById = async (req, res) => {
     const { fields = 'full', publicOnly = 'false' } = req.query;
     const isPublicOnly = publicOnly === 'true';
 
+    // Build match stage - check displayOnPublicPage if publicOnly is true
+    const matchStage = { _id: new mongoose.Types.ObjectId(req.params.id) };
+    if (isPublicOnly) {
+      matchStage.displayOnPublicPage = true;
+    }
+
     // Use aggregation for better performance and filtering
     const pipeline = [
-      { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+      { $match: matchStage },
       {
         $lookup: {
           from: 'users',
@@ -576,11 +590,21 @@ export const getCourseById = async (req, res) => {
           localField: 'courseGroup',
           foreignField: '_id',
           as: 'courseGroup',
-          pipeline: [{ $project: { title: 1, description: 1, icon: 1 } }]
+          pipeline: [
+            ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
+            { $project: { title: 1, description: 1, icon: 1, displayOnPublicPage: 1 } }
+          ]
         }
       },
       { $unwind: { path: '$courseGroup', preserveNullAndEmptyArrays: true } }
     ];
+
+    // If publicOnly and courseGroup is empty (filtered out), return 404
+    if (isPublicOnly) {
+      pipeline.push({
+        $match: { courseGroup: { $exists: true, $ne: null } }
+      });
+    }
 
     // Add lectures lookup
     const lectureFields = fields === 'full'
