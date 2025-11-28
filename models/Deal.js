@@ -74,11 +74,15 @@ const dealSchema = new Schema(
       ref: 'User',
       required: true,
     },
+    displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
   },
   {
     timestamps: true,
   }
 );
+
+// Add index for performance optimization
+dealSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
 
 const Deal = mongoose.model('Deal', dealSchema);
 

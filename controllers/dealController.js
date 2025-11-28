@@ -33,6 +33,7 @@ export const createDeal = async (req, res) => {
       url: url || '',
       image: image || '',
       createdBy: dealCreatorId,
+      displayOnPublicPage: req.body.displayOnPublicPage || false,
     });
 
     await deal.save();
@@ -46,7 +47,14 @@ export const createDeal = async (req, res) => {
 // Get all deals - OPTIMIZED VERSION
 export const getAllDeals = async (req, res) => {
   try {
-    const { fields = 'basic', sortBy = 'name', order = 'asc' } = req.query;
+    const { fields = 'basic', sortBy = 'name', order = 'asc', publicOnly = 'false' } = req.query;
+    const isPublicOnly = publicOnly === 'true';
+
+    // Build query with public pages filter
+    const query = {};
+    if (isPublicOnly) {
+      query.displayOnPublicPage = true;
+    }
 
     let populateFields = [];
     if (fields === 'basic') {
@@ -72,7 +80,7 @@ export const getAllDeals = async (req, res) => {
     }
 
     // Fetch all deals with populated fields
-    const deals = await Deal.find()
+    const deals = await Deal.find(query)
       .populate(populateFields)
       .lean();
 
@@ -188,6 +196,7 @@ export const updateDeal = async (req, res) => {
     if (req.body.hasOwnProperty('sourceId')) deal.source = sourceId || null;
     if (req.body.hasOwnProperty('url')) deal.url = url || '';
     if (req.body.hasOwnProperty('image')) deal.image = image || '';
+    if (req.body.hasOwnProperty('displayOnPublicPage')) deal.displayOnPublicPage = req.body.displayOnPublicPage === true;
 
     await deal.save();
     return res.status(200).json({ message: 'Deal updated successfully', deal });
@@ -227,11 +236,18 @@ export const filterDeals = async (req, res) => {
       requirementId,
       sourceId,
       createdBy,
-      fields = 'basic'
+      fields = 'basic',
+      publicOnly = 'false'
     } = req.query;
+    const isPublicOnly = publicOnly === 'true';
 
     const filter = {};
     console.log("req.query", req.query);
+
+    // Add public pages filter if needed
+    if (isPublicOnly) {
+      filter.displayOnPublicPage = true;
+    }
 
     if (name) {
       filter.name = { $regex: name, $options: 'i' }; // case-insensitive search

@@ -9,6 +9,7 @@ const courseGroupSchema = new Schema(
     icon: { type: String, required: true },
     courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
   },
   { timestamps: true }
 );
@@ -29,6 +30,7 @@ const courseSchema = new Schema(
     // Legacy fields for backward compatibility (deprecated)
     ebookName: { type: String, default: '' },
     ebookUrl: { type: String, default: '' },
+    displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
   },
   { timestamps: true }
 );
@@ -46,7 +48,7 @@ const lectureSchema = new Schema(
     }],
     completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public page
+    displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
   },
   { timestamps: true }
 );
@@ -54,10 +56,12 @@ const lectureSchema = new Schema(
 // Add indexes for performance optimization
 courseGroupSchema.index({ createdBy: 1 });
 courseGroupSchema.index({ title: 'text', description: 'text' }); // Text search index
+courseGroupSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
 
 courseSchema.index({ courseGroup: 1 }); // Critical: used in many queries
 courseSchema.index({ createdBy: 1 });
 courseSchema.index({ title: 'text', description: 'text' }); // Text search index
+courseSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
 
 lectureSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
 lectureSchema.index({ createdBy: 1 });
