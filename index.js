@@ -1,9 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import morgan from 'morgan';
 import connectDB from './config/db.js';
 import routes from './routes/index.js';
-import morgan from 'morgan';
+import { errorHandler } from './utils/errors.js';
 import { WebinarOnRecording } from './models/Webinar.js';
 import Webinar from './models/Webinar.js';
 
@@ -100,15 +101,8 @@ app.use('*', (req, res) => {
   });
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
-});
+// Global error handler (must be last)
+app.use(errorHandler);
 
 const port = process.env.PORT || 5000;
 
