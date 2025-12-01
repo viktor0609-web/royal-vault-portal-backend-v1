@@ -389,7 +389,6 @@ export const resetUserPassword = async (req, res) => {
 
   try {
     const { userId } = req.params;
-    const { newPassword, sendEmail: sendPasswordEmail } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
@@ -400,41 +399,24 @@ export const resetUserPassword = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Generate new password or use provided one
-    const password = newPassword || crypto.randomBytes(8).toString('hex');
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    user.password = hashedPassword;
-    user.isVerified = true; // Mark as verified when admin resets password
-    user.verificationToken = null;
-    user.resetPasswordToken = null;
-    user.resetPasswordExpire = null;
-
+    // Generate reset token (same as forgotPassword)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    // Send password reset email if requested
-    if (sendPasswordEmail !== false) {
-      try {
-        const resetUrl = `${process.env.CLIENT_URL}/reset-password/${user.resetPasswordToken || 'manual-reset'}`;
-        const templateId = process.env.PASSWORD_RESET_TEMPLATE_ID;
-        const data = {
-          firstName: user.firstName,
-          lastName: user.lastName,
-          url: resetUrl,
-          subject: "Royal Vault Portal - Password Reset",
-          password: password // Include password in email if needed
-        };
-        await sendEmail(user.email, data, templateId);
-      } catch (emailError) {
-        console.log("Email sending error:", emailError);
-        // Continue even if email fails
-      }
-    }
+    // Send password reset email
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    const templateId = process.env.PASSWORD_RESET_TEMPLATE_ID;
+    const data = {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      url: resetUrl,
+      subject: "Royal Vault Portal - Password Reset"
+    };
+    await sendEmail(user.email, data, templateId);
 
-    return res.status(200).json({
-      message: 'Password reset successfully',
-      password: sendPasswordEmail === false ? password : undefined // Only return password if not sending email
-    });
+    return res.status(200).json({ message: 'Password reset email sent.' });
   } catch (error) {
     console.error('Reset user password error:', error);
     return res.status(500).json({ message: 'Server Error', error: error.message });
