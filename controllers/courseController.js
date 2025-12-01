@@ -49,10 +49,10 @@ const isUserInHubSpotLists = async (userEmail, listIds) => {
       return false;
     }
 
-    // Get all lists this contact belongs to using associations API
+    // Get all lists this contact belongs to using the list memberships API
     try {
       const contactListsResponse = await axios.get(
-        `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}/associations/lists`,
+        `https://api.hubapi.com/crm/v3/lists/records/0-1/${contactId}/memberships`,
         {
           headers: {
             Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
@@ -62,9 +62,12 @@ const isUserInHubSpotLists = async (userEmail, listIds) => {
       );
 
       // Extract list IDs from the response
-      const contactListIds = contactListsResponse.data.results?.map(result => String(result.toObjectId)) || [];
+      // The response should contain listId values the contact belongs to
+      const contactListIds = contactListsResponse.data.results?.map(result => String(result.listId)) || [];
 
       // Check if contact is in any of the required lists
+      console.log('contactListIds', contactListIds);
+      console.log('listIds', listIds);
       for (const requiredListId of listIds) {
         if (contactListIds.includes(String(requiredListId))) {
           return true; // Contact is in at least one of the required lists
@@ -74,14 +77,14 @@ const isUserInHubSpotLists = async (userEmail, listIds) => {
       // Contact is not in any of the required lists
       return false;
     } catch (listsError) {
-      console.error(`Error fetching contact lists:`, listsError.response?.data || listsError.message);
+      console.error(`Error fetching contact list memberships:`, listsError.response?.data || listsError.message);
       // On error, default to allowing access to avoid blocking users
-      return true;
+      return false;
     }
   } catch (error) {
     console.error('Error checking HubSpot list membership:', error.response?.data || error.message);
     // On error, default to allowing access to avoid blocking users
-    return true;
+    return false;
   }
 };
 
