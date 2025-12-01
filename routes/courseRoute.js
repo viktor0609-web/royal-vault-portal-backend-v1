@@ -17,13 +17,13 @@ import {
   deleteLecture,
   completeLecture,
 } from '../controllers/courseController.js';
-import { protect, authorize } from '../middleware/authMiddleware.js';
+import { protect, authorize, optionalProtect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // CourseGroup routes
-router.get('/groups', getAllCourseGroups); // Get all course groups
-router.get('/groups/:id', getCourseGroupById); // Get a course group by ID
+router.get('/groups', optionalProtect, getAllCourseGroups); // Get all course groups (optional auth for HubSpot list filtering)
+router.get('/groups/:id', optionalProtect, getCourseGroupById); // Get a course group by ID (optional auth for HubSpot list filtering)
 router.post('/groups', protect, authorize('admin'), createCourseGroup); // Create a new course group
 router.put('/groups/:id', protect, authorize('admin'), updateCourseGroup); // Update a course group
 router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup); // Delete a course group
