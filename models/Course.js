@@ -10,6 +10,7 @@ const courseGroupSchema = new Schema(
     courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
+    hubSpotListIds: [{ type: String }], // Array of HubSpot list IDs for visibility targeting
   },
   { timestamps: true }
 );

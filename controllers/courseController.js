@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { CourseGroup, Course, Lecture } from '../models/Course.js';
 import User from '../models/User.js';
+import axios from 'axios';
 
 // Helper function to build $project stage from field string
 const buildProjectStage = (fieldsString) => {
@@ -12,12 +13,86 @@ const buildProjectStage = (fieldsString) => {
   return project;
 };
 
+// Helper function to check if a user's email is in any of the specified HubSpot lists
+const isUserInHubSpotLists = async (userEmail, listIds) => {
+  if (!listIds || listIds.length === 0) {
+    return true; // No list restrictions, accessible to all
+  }
+
+  if (!userEmail) {
+    return false; // No user email, can't check membership
+  }
+
+  const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+  if (!HUBSPOT_PRIVATE_API_KEY) {
+    console.warn('HubSpot API key not configured, allowing access by default');
+    return true; // If HubSpot is not configured, allow access
+  }
+
+  try {
+    // Get contact by email first
+    let contactId;
+    try {
+      const contactResponse = await axios.get(
+        `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(userEmail)}?idProperty=email`,
+        {
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      contactId = contactResponse.data.id;
+    } catch (contactError) {
+      // Contact not found in HubSpot
+      console.log(`Contact not found in HubSpot for email: ${userEmail}`);
+      return false;
+    }
+
+    // Check each list to see if the user is a member
+    for (const listId of listIds) {
+      try {
+        // Check if contact is in the list using the list contacts endpoint
+        const listMembershipResponse = await axios.get(
+          `https://api.hubapi.com/crm/v3/lists/${listId}/contacts/${contactId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        // If we get a successful response, contact is in the list
+        if (listMembershipResponse.status === 200) {
+          return true;
+        }
+      } catch (listError) {
+        // If contact is not in this list (404), continue to next list
+        if (listError.response?.status === 404) {
+          continue;
+        }
+        // For other errors, log and continue
+        console.log(`Error checking list ${listId} membership:`, listError.response?.data || listError.message);
+        continue;
+      }
+    }
+
+    // User is not in any of the specified lists
+    return false;
+  } catch (error) {
+    console.error('Error checking HubSpot list membership:', error.response?.data || error.message);
+    // On error, default to allowing access to avoid blocking users
+    return true;
+  }
+};
+
 // ------------------ CourseGroup CRUD ------------------
 
 // Create a new CourseGroup
 export const createCourseGroup = async (req, res) => {
   try {
-    const { title, description, icon } = req.body;
+    const { title, description, icon, hubSpotListIds } = req.body;
 
     // Validation
     if (!title || !description || !icon) {
@@ -25,12 +100,13 @@ export const createCourseGroup = async (req, res) => {
     }
 
     const createdBy = req.user._id;
-    const courseGroup = await CourseGroup.create({ 
-      title, 
-      description, 
-      icon, 
+    const courseGroup = await CourseGroup.create({
+      title,
+      description,
+      icon,
       createdBy,
-      displayOnPublicPage: req.body.displayOnPublicPage || false
+      displayOnPublicPage: req.body.displayOnPublicPage || false,
+      hubSpotListIds: Array.isArray(hubSpotListIds) ? hubSpotListIds : []
     });
     await courseGroup.populate('createdBy', 'name email');
 
@@ -220,12 +296,39 @@ export const getAllCourseGroups = async (req, res) => {
     pipeline.push({ $limit: limitNum });
 
     // Execute aggregation
-    const courseGroups = await CourseGroup.aggregate(pipeline);
+    let courseGroups = await CourseGroup.aggregate(pipeline);
 
-    // Get total count for pagination
-    const countPipeline = [{ $match: matchStage }, { $count: 'total' }];
-    const countResult = await CourseGroup.aggregate(countPipeline);
-    const total = countResult[0]?.total || 0;
+    // Filter by HubSpot list membership if publicOnly
+    if (isPublicOnly) {
+      const filteredGroups = [];
+
+      for (const group of courseGroups) {
+        // If no hubSpotListIds or empty array, show to all (including unauthenticated users)
+        if (!group.hubSpotListIds || group.hubSpotListIds.length === 0) {
+          filteredGroups.push(group);
+        } else {
+          // If user is authenticated, check HubSpot list membership
+          console.log('group.hubSpotListIds', group.hubSpotListIds);
+          console.log('req.user', req.user);
+          if (req.user && req.user.email) {
+            const userEmail = req.user.email;
+            console.log('userEmail', userEmail);
+            const hasAccess = await isUserInHubSpotLists(userEmail, group.hubSpotListIds);
+            console.log('hasAccess', userEmail, group.hubSpotListIds, hasAccess);
+            if (hasAccess) {
+              filteredGroups.push(group);
+            }
+          }
+          // If user is not authenticated and course group has list restrictions, don't show it
+          // (This means only authenticated users in the specified lists can see it)
+        }
+      }
+      // console.log('filteredGroups', filteredGroups);
+      courseGroups = filteredGroups;
+    }
+
+    // Get total count for pagination (after filtering)
+    const total = courseGroups.length;
 
     res.json({
       data: courseGroups,
@@ -331,7 +434,26 @@ export const getCourseGroupById = async (req, res) => {
       return res.status(404).json({ message: 'CourseGroup not found' });
     }
 
-    res.json(result[0]);
+    const courseGroup = result[0];
+
+    // Check HubSpot list membership if publicOnly
+    if (isPublicOnly) {
+      // If course group has hubSpotListIds, check membership
+      if (courseGroup.hubSpotListIds && courseGroup.hubSpotListIds.length > 0) {
+        // If user is not authenticated, deny access (list-restricted content requires authentication)
+        if (!req.user || !req.user.email) {
+          return res.status(401).json({ message: 'Authentication required to view this course group.' });
+        }
+
+        const userEmail = req.user.email;
+        const hasAccess = await isUserInHubSpotLists(userEmail, courseGroup.hubSpotListIds);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied. You do not have permission to view this course group.' });
+        }
+      }
+    }
+
+    res.json(courseGroup);
   } catch (error) {
     if (error.name === 'CastError') {
       return res.status(404).json({ message: 'CourseGroup not found' });
@@ -344,7 +466,7 @@ export const getCourseGroupById = async (req, res) => {
 // Update CourseGroup
 export const updateCourseGroup = async (req, res) => {
   try {
-    const { title, description, icon } = req.body;
+    const { title, description, icon, hubSpotListIds } = req.body;
 
     // Validation
     if (title !== undefined && !title.trim()) {
@@ -357,7 +479,15 @@ export const updateCourseGroup = async (req, res) => {
       return res.status(400).json({ message: 'Icon cannot be empty' });
     }
 
-    const updated = await CourseGroup.findByIdAndUpdate(req.params.id, req.body, { new: true })
+    // Prepare update data
+    const updateData = { ...req.body };
+
+    // Handle hubSpotListIds - ensure it's an array
+    if (hubSpotListIds !== undefined) {
+      updateData.hubSpotListIds = Array.isArray(hubSpotListIds) ? hubSpotListIds : [];
+    }
+
+    const updated = await CourseGroup.findByIdAndUpdate(req.params.id, updateData, { new: true })
       .populate('createdBy', 'name email');
     if (!updated) return res.status(404).json({ message: 'CourseGroup not found' });
     res.json(updated);
