@@ -49,37 +49,35 @@ const isUserInHubSpotLists = async (userEmail, listIds) => {
       return false;
     }
 
-    // Check each list to see if the user is a member
-    for (const listId of listIds) {
-      try {
-        // Check if contact is in the list using the list contacts endpoint
-        const listMembershipResponse = await axios.get(
-          `https://api.hubapi.com/crm/v3/lists/${listId}/contacts/${contactId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+    // Get all lists this contact belongs to using associations API
+    try {
+      const contactListsResponse = await axios.get(
+        `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}/associations/lists`,
+        {
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        // If we get a successful response, contact is in the list
-        if (listMembershipResponse.status === 200) {
-          return true;
+      // Extract list IDs from the response
+      const contactListIds = contactListsResponse.data.results?.map(result => String(result.toObjectId)) || [];
+
+      // Check if contact is in any of the required lists
+      for (const requiredListId of listIds) {
+        if (contactListIds.includes(String(requiredListId))) {
+          return true; // Contact is in at least one of the required lists
         }
-      } catch (listError) {
-        // If contact is not in this list (404), continue to next list
-        if (listError.response?.status === 404) {
-          continue;
-        }
-        // For other errors, log and continue
-        console.log(`Error checking list ${listId} membership:`, listError.response?.data || listError.message);
-        continue;
       }
-    }
 
-    // User is not in any of the specified lists
-    return false;
+      // Contact is not in any of the required lists
+      return false;
+    } catch (listsError) {
+      console.error(`Error fetching contact lists:`, listsError.response?.data || listsError.message);
+      // On error, default to allowing access to avoid blocking users
+      return true;
+    }
   } catch (error) {
     console.error('Error checking HubSpot list membership:', error.response?.data || error.message);
     // On error, default to allowing access to avoid blocking users
@@ -301,20 +299,24 @@ export const getAllCourseGroups = async (req, res) => {
     // Filter by HubSpot list membership if publicOnly
     if (isPublicOnly) {
       const filteredGroups = [];
+      // Check if user is authenticated (route doesn't require auth, so req.user might be undefined)
+      const isAuthenticated = req.user && req.user.email;
+      const userEmail = isAuthenticated ? req.user.email : null;
+
+      console.log('isAuthenticated', isAuthenticated);
+      console.log('userEmail', userEmail);
+      console.log('req.user', req.user);
 
       for (const group of courseGroups) {
         // If no hubSpotListIds or empty array, show to all (including unauthenticated users)
         if (!group.hubSpotListIds || group.hubSpotListIds.length === 0) {
           filteredGroups.push(group);
         } else {
-          // If user is authenticated, check HubSpot list membership
-          console.log('group.hubSpotListIds', group.hubSpotListIds);
-          console.log('req.user', req.user);
-          if (req.user && req.user.email) {
-            const userEmail = req.user.email;
-            console.log('userEmail', userEmail);
+          // Course group has list restrictions
+          if (isAuthenticated && userEmail) {
+            // User is authenticated - check HubSpot list membership
             const hasAccess = await isUserInHubSpotLists(userEmail, group.hubSpotListIds);
-            console.log('hasAccess', userEmail, group.hubSpotListIds, hasAccess);
+            console.log('hasAccess', hasAccess);
             if (hasAccess) {
               filteredGroups.push(group);
             }
@@ -323,7 +325,7 @@ export const getAllCourseGroups = async (req, res) => {
           // (This means only authenticated users in the specified lists can see it)
         }
       }
-      // console.log('filteredGroups', filteredGroups);
+
       courseGroups = filteredGroups;
     }
 
@@ -440,8 +442,11 @@ export const getCourseGroupById = async (req, res) => {
     if (isPublicOnly) {
       // If course group has hubSpotListIds, check membership
       if (courseGroup.hubSpotListIds && courseGroup.hubSpotListIds.length > 0) {
+        // Check if user is authenticated (route doesn't require auth, so req.user might be undefined)
+        const isAuthenticated = req.user && req.user.email;
+
         // If user is not authenticated, deny access (list-restricted content requires authentication)
-        if (!req.user || !req.user.email) {
+        if (!isAuthenticated) {
           return res.status(401).json({ message: 'Authentication required to view this course group.' });
         }
 

@@ -33,3 +33,21 @@ export const authorizeSupaadmin = () => {
     next();
   };
 };
+
+// Optional protect middleware - sets req.user if token is present, but doesn't block if token is missing
+// Useful for routes that should work for both authenticated and unauthenticated users
+export const optionalProtect = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      req.user = await User.findById(decoded.id).select('-password');
+    } catch (error) {
+      // If token is invalid, just continue without setting req.user
+      // This allows the route to work for unauthenticated users
+      req.user = null;
+    }
+  }
+  // If no token, continue without setting req.user
+  next();
+};
