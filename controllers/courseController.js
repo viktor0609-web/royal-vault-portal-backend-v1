@@ -172,7 +172,7 @@ export const getAllCourseGroups = async (req, res) => {
           localField: 'createdBy',
           foreignField: '_id',
           as: 'createdBy',
-          pipeline: [{ $project: { name: 1, email: 1 } }]
+          pipeline: [{ $project: { firstName: 1, lastName: 1 } }]
         }
       },
       { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
