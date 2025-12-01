@@ -306,11 +306,21 @@ export const getAllCourseGroups = async (req, res) => {
       const isAuthenticated = req.user && req.user.email;
       const userEmail = isAuthenticated ? req.user.email : null;
 
+      // Check if user has royallegalsolutions.com email - they can see all courses and deals
+      const isRoyalLegalUser = userEmail && userEmail.toLowerCase().includes('royallegalsolutions.com');
+
       console.log('isAuthenticated', isAuthenticated);
       console.log('userEmail', userEmail);
+      console.log('isRoyalLegalUser', isRoyalLegalUser);
       console.log('req.user', req.user);
 
       for (const group of courseGroups) {
+        // If user has royallegalsolutions.com email, show all course groups
+        if (isRoyalLegalUser) {
+          filteredGroups.push(group);
+          continue;
+        }
+
         // If no hubSpotListIds or empty array, show to all (including unauthenticated users)
         if (!group.hubSpotListIds || group.hubSpotListIds.length === 0) {
           filteredGroups.push(group);
@@ -448,15 +458,24 @@ export const getCourseGroupById = async (req, res) => {
         // Check if user is authenticated (route doesn't require auth, so req.user might be undefined)
         const isAuthenticated = req.user && req.user.email;
 
-        // If user is not authenticated, deny access (list-restricted content requires authentication)
-        if (!isAuthenticated) {
-          return res.status(401).json({ message: 'Authentication required to view this course group.' });
-        }
+        // Check if user has royallegalsolutions.com email - they can see all courses and deals
+        if (isAuthenticated) {
+          const userEmail = req.user.email;
+          const isRoyalLegalUser = userEmail && userEmail.toLowerCase().includes('royallegalsolutions.com');
 
-        const userEmail = req.user.email;
-        const hasAccess = await isUserInHubSpotLists(userEmail, courseGroup.hubSpotListIds);
-        if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied. You do not have permission to view this course group.' });
+          // If user has royallegalsolutions.com email, bypass HubSpot list check
+          if (isRoyalLegalUser) {
+            // Allow access - royallegalsolutions.com users can see all course groups
+          } else {
+            // For other users, check HubSpot list membership
+            const hasAccess = await isUserInHubSpotLists(userEmail, courseGroup.hubSpotListIds);
+            if (!hasAccess) {
+              return res.status(403).json({ message: 'Access denied. You do not have permission to view this course group.' });
+            }
+          }
+        } else {
+          // If user is not authenticated, deny access (list-restricted content requires authentication)
+          return res.status(401).json({ message: 'Authentication required to view this course group.' });
         }
       }
     }
