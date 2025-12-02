@@ -714,11 +714,21 @@ export const migrateHubSpotContacts = async (req, res) => {
     totalCreated: 0,
     totalSkipped: 0,
     totalErrors: 0,
-    errors: [],
+    errors: [], // Limited to last 100 errors to prevent memory issues
     currentBatch: 0,
     after: null
   };
   migrationState.set(migrationId, state);
+
+  // Helper function to limit errors array size
+  const addError = (error) => {
+    state.errors.push(error);
+    state.totalErrors++;
+    // Keep only last 100 errors to prevent memory issues
+    if (state.errors.length > 100) {
+      state.errors.shift(); // Remove oldest error
+    }
+  };
 
   // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: 'connected', migrationId })}\n\n`);
@@ -745,7 +755,7 @@ export const migrateHubSpotContacts = async (req, res) => {
       try {
         const params = new URLSearchParams({
           properties: 'firstname,lastname,name,email,phone',
-          limit: '100' // Process 100 contacts per request (HubSpot max) for faster migration
+          limit: '50' // Process 50 contacts per request (balanced for speed and memory)
         });
 
         if (state.after) {
@@ -763,11 +773,16 @@ export const migrateHubSpotContacts = async (req, res) => {
         const paging = response.data.paging;
         state.currentBatch++;
 
-        // Send batch start progress
+        // Send batch start progress (without errors array to save memory)
         res.write(`data: ${JSON.stringify({
           type: 'progress',
           message: `Processing batch ${state.currentBatch} of ${contacts.length} contacts...`,
-          ...state
+          migrationId: state.migrationId,
+          totalProcessed: state.totalProcessed,
+          totalCreated: state.totalCreated,
+          totalSkipped: state.totalSkipped,
+          totalErrors: state.totalErrors,
+          currentBatch: state.currentBatch
         })}\n\n`);
 
         // Batch check for existing users to optimize database queries
@@ -785,8 +800,14 @@ export const migrateHubSpotContacts = async (req, res) => {
         for (const contact of contacts) {
           // Check if paused - wait in loop and send periodic updates
           while (state.isPaused && !state.isCompleted) {
-            // Send paused status update every second
-            res.write(`data: ${JSON.stringify({ type: 'paused', ...state })}\n\n`);
+            // Send paused status update every second (without errors array)
+            res.write(`data: ${JSON.stringify({
+              type: 'paused',
+              totalProcessed: state.totalProcessed,
+              totalCreated: state.totalCreated,
+              totalSkipped: state.totalSkipped,
+              totalErrors: state.totalErrors
+            })}\n\n`);
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
 
@@ -805,10 +826,16 @@ export const migrateHubSpotContacts = async (req, res) => {
           // Skip if email is missing
           if (!email) {
             state.totalSkipped++;
-            state.errors.push({ contact: contact.id, reason: 'Missing email address' });
-            // Send progress update every 10 contacts for better performance
-            if (state.totalProcessed % 10 === 0) {
-              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            addError({ contact: contact.id, reason: 'Missing email address' });
+            // Send progress update every 50 contacts to reduce memory usage
+            if (state.totalProcessed % 50 === 0) {
+              res.write(`data: ${JSON.stringify({
+                type: 'progress',
+                totalProcessed: state.totalProcessed,
+                totalCreated: state.totalCreated,
+                totalSkipped: state.totalSkipped,
+                totalErrors: state.totalErrors
+              })}\n\n`);
             }
             continue;
           }
@@ -816,9 +843,15 @@ export const migrateHubSpotContacts = async (req, res) => {
           // Check if user already exists (using batch check result)
           if (existingEmails.has(email)) {
             state.totalSkipped++;
-            // Send progress update every 10 contacts for better performance
-            if (state.totalProcessed % 10 === 0) {
-              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            // Send progress update every 50 contacts to reduce memory usage
+            if (state.totalProcessed % 50 === 0) {
+              res.write(`data: ${JSON.stringify({
+                type: 'progress',
+                totalProcessed: state.totalProcessed,
+                totalCreated: state.totalCreated,
+                totalSkipped: state.totalSkipped,
+                totalErrors: state.totalErrors
+              })}\n\n`);
             }
             continue; // Skip existing users
           }
@@ -838,12 +871,21 @@ export const migrateHubSpotContacts = async (req, res) => {
           // Validate required fields
           if (!firstName || !lastName || !phone) {
             state.totalSkipped++;
-            state.errors.push({
+            addError({
               contact: contact.id,
               email,
               reason: `Missing required fields: firstName=${!!firstName}, lastName=${!!lastName}, phone=${!!phone}`
             });
-            res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            // Send progress update every 50 contacts to reduce memory usage
+            if (state.totalProcessed % 50 === 0) {
+              res.write(`data: ${JSON.stringify({
+                type: 'progress',
+                totalProcessed: state.totalProcessed,
+                totalCreated: state.totalCreated,
+                totalSkipped: state.totalSkipped,
+                totalErrors: state.totalErrors
+              })}\n\n`);
+            }
             continue;
           }
 
@@ -864,21 +906,32 @@ export const migrateHubSpotContacts = async (req, res) => {
             });
 
             state.totalCreated++;
-            // Send progress update every 10 contacts for better performance
-            if (state.totalProcessed % 10 === 0) {
-              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            // Send progress update every 50 contacts to reduce memory usage
+            if (state.totalProcessed % 50 === 0) {
+              res.write(`data: ${JSON.stringify({
+                type: 'progress',
+                totalProcessed: state.totalProcessed,
+                totalCreated: state.totalCreated,
+                totalSkipped: state.totalSkipped,
+                totalErrors: state.totalErrors
+              })}\n\n`);
             }
           } catch (createError) {
-            state.totalErrors++;
-            state.errors.push({
+            addError({
               contact: contact.id,
               email,
               reason: createError.message
             });
             console.error(`Error creating user for ${email}:`, createError.message);
-            // Send progress update every 10 contacts for better performance
-            if (state.totalProcessed % 10 === 0) {
-              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            // Send progress update every 50 contacts to reduce memory usage
+            if (state.totalProcessed % 50 === 0) {
+              res.write(`data: ${JSON.stringify({
+                type: 'progress',
+                totalProcessed: state.totalProcessed,
+                totalCreated: state.totalCreated,
+                totalSkipped: state.totalSkipped,
+                totalErrors: state.totalErrors
+              })}\n\n`);
             }
           }
         }
@@ -886,8 +939,16 @@ export const migrateHubSpotContacts = async (req, res) => {
         // Check if there are more pages
         state.after = paging?.next?.after || null;
 
-        // Send final progress update for this batch
-        res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+        // Send final progress update for this batch (without errors array to save memory)
+        res.write(`data: ${JSON.stringify({
+          type: 'progress',
+          message: `Completed batch ${state.currentBatch}`,
+          totalProcessed: state.totalProcessed,
+          totalCreated: state.totalCreated,
+          totalSkipped: state.totalSkipped,
+          totalErrors: state.totalErrors,
+          currentBatch: state.currentBatch
+        })}\n\n`);
 
         // Minimal delay between batches to avoid rate limiting (reduced from 500ms to 100ms for faster processing)
         if (state.after) {
@@ -919,7 +980,7 @@ export const migrateHubSpotContacts = async (req, res) => {
         totalSkipped: state.totalSkipped,
         totalErrors: state.totalErrors
       },
-      errors: state.errors.slice(0, 50) // Return first 50 errors if any
+      errors: state.errors.slice(-50) // Return last 50 errors (most recent) if any
     })}\n\n`);
 
     // Clean up after 1 minute
