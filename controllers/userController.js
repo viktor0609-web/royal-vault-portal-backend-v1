@@ -648,3 +648,292 @@ export const bulkDeleteUsers = async (req, res) => {
   }
 };
 
+// In-memory storage for migration state (in production, consider using Redis)
+const migrationState = new Map();
+
+// Migrate HubSpot contacts to database with real-time progress (SSE) and pause/resume
+export const migrateHubSpotContacts = async (req, res) => {
+  const migrationId = req.query.migrationId || `migration_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const urlPath = req.path || req.url || '';
+
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+  // Handle pause action
+  if (urlPath.includes('/pause')) {
+    if (migrationState.has(migrationId)) {
+      const state = migrationState.get(migrationId);
+      state.isPaused = true;
+      // Send progress update with paused status
+      res.write(`data: ${JSON.stringify({ type: 'paused', migrationId, ...state })}\n\n`);
+      res.end();
+      return;
+    }
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Migration not found' })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // Handle resume action
+  if (urlPath.includes('/resume')) {
+    if (migrationState.has(migrationId)) {
+      const state = migrationState.get(migrationId);
+      state.isPaused = false;
+      // Send progress update with resumed status
+      res.write(`data: ${JSON.stringify({ type: 'resumed', migrationId, ...state })}\n\n`);
+      res.end();
+      return;
+    }
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Migration not found' })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // Handle status check
+  if (urlPath.includes('/status')) {
+    if (migrationState.has(migrationId)) {
+      const state = migrationState.get(migrationId);
+      res.write(`data: ${JSON.stringify({ type: 'status', ...state })}\n\n`);
+      res.end();
+      return;
+    }
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Migration not found' })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // Initialize migration state
+  const state = {
+    migrationId,
+    isPaused: false,
+    isCompleted: false,
+    totalProcessed: 0,
+    totalCreated: 0,
+    totalSkipped: 0,
+    totalErrors: 0,
+    errors: [],
+    currentBatch: 0,
+    after: null
+  };
+  migrationState.set(migrationId, state);
+
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ type: 'connected', migrationId })}\n\n`);
+
+  try {
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+    if (!HUBSPOT_PRIVATE_API_KEY) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'HubSpot API key is not configured' })}\n\n`);
+      res.end();
+      return;
+    }
+
+    const HUBSPOT_API_URL = 'https://api.hubapi.com/crm/v3/objects/contacts';
+
+    // Fetch all contacts from HubSpot with pagination
+    do {
+      // Check if paused
+      while (state.isPaused && !state.isCompleted) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (state.isCompleted) break;
+
+      try {
+        const params = new URLSearchParams({
+          properties: 'firstname,lastname,name,email,phone',
+          limit: '100' // Process 100 contacts per request (HubSpot max) for faster migration
+        });
+
+        if (state.after) {
+          params.append('after', state.after);
+        }
+
+        const response = await axios.get(`${HUBSPOT_API_URL}?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const contacts = response.data.results || [];
+        const paging = response.data.paging;
+        state.currentBatch++;
+
+        // Send batch start progress
+        res.write(`data: ${JSON.stringify({
+          type: 'progress',
+          message: `Processing batch ${state.currentBatch} of ${contacts.length} contacts...`,
+          ...state
+        })}\n\n`);
+
+        // Batch check for existing users to optimize database queries
+        const emails = contacts
+          .map(c => c.properties?.email?.trim().toLowerCase())
+          .filter(email => email);
+
+        const existingEmails = new Set();
+        if (emails.length > 0) {
+          const existingUsers = await User.find({ email: { $in: emails } }).select('email').lean();
+          existingUsers.forEach(user => existingEmails.add(user.email.toLowerCase()));
+        }
+
+        // Process each contact step by step
+        for (const contact of contacts) {
+          // Check if paused - wait in loop and send periodic updates
+          while (state.isPaused && !state.isCompleted) {
+            // Send paused status update every second
+            res.write(`data: ${JSON.stringify({ type: 'paused', ...state })}\n\n`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+          if (state.isCompleted) break;
+
+          state.totalProcessed++;
+          const properties = contact.properties || {};
+
+          // Extract data from HubSpot contact
+          const email = properties.email?.trim().toLowerCase();
+          let firstName = properties.firstname?.trim() || '';
+          let lastName = properties.lastname?.trim() || '';
+          const phone = properties.phone?.trim() || '';
+          const fullName = properties.name?.trim() || '';
+
+          // Skip if email is missing
+          if (!email) {
+            state.totalSkipped++;
+            state.errors.push({ contact: contact.id, reason: 'Missing email address' });
+            // Send progress update every 10 contacts for better performance
+            if (state.totalProcessed % 10 === 0) {
+              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            }
+            continue;
+          }
+
+          // Check if user already exists (using batch check result)
+          if (existingEmails.has(email)) {
+            state.totalSkipped++;
+            // Send progress update every 10 contacts for better performance
+            if (state.totalProcessed % 10 === 0) {
+              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            }
+            continue; // Skip existing users
+          }
+
+          // If firstname/lastname are missing but we have a full name, split it
+          if ((!firstName || !lastName) && fullName) {
+            const nameParts = fullName.trim().split(/\s+/);
+            if (nameParts.length >= 2) {
+              firstName = nameParts[0];
+              lastName = nameParts.slice(1).join(' '); // Handle multiple last names
+            } else if (nameParts.length === 1) {
+              firstName = nameParts[0];
+              lastName = ''; // Set empty if only one name part
+            }
+          }
+
+          // Validate required fields
+          if (!firstName || !lastName || !phone) {
+            state.totalSkipped++;
+            state.errors.push({
+              contact: contact.id,
+              email,
+              reason: `Missing required fields: firstName=${!!firstName}, lastName=${!!lastName}, phone=${!!phone}`
+            });
+            res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            continue;
+          }
+
+          // Create new user
+          try {
+            const verificationToken = crypto.randomBytes(32).toString('hex');
+            const hashedPassword = await bcrypt.hash('123456', 10); // Default password
+
+            await User.create({
+              firstName,
+              lastName,
+              email,
+              phone,
+              password: hashedPassword,
+              role: 'user',
+              verificationToken,
+              isVerified: false
+            });
+
+            state.totalCreated++;
+            // Send progress update every 10 contacts for better performance
+            if (state.totalProcessed % 10 === 0) {
+              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            }
+          } catch (createError) {
+            state.totalErrors++;
+            state.errors.push({
+              contact: contact.id,
+              email,
+              reason: createError.message
+            });
+            console.error(`Error creating user for ${email}:`, createError.message);
+            // Send progress update every 10 contacts for better performance
+            if (state.totalProcessed % 10 === 0) {
+              res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+            }
+          }
+        }
+
+        // Check if there are more pages
+        state.after = paging?.next?.after || null;
+
+        // Send final progress update for this batch
+        res.write(`data: ${JSON.stringify({ type: 'progress', ...state })}\n\n`);
+
+        // Minimal delay between batches to avoid rate limiting (reduced from 500ms to 100ms for faster processing)
+        if (state.after) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay between batches
+        }
+      } catch (hubspotError) {
+        console.error('HubSpot API error:', hubspotError.response?.data || hubspotError.message);
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: 'Error fetching HubSpot contacts',
+          error: hubspotError.response?.data || hubspotError.message,
+          ...state
+        })}\n\n`);
+        state.isCompleted = true;
+        migrationState.delete(migrationId);
+        res.end();
+        return;
+      }
+    } while (state.after && !state.isCompleted);
+
+    // Migration completed
+    state.isCompleted = true;
+    res.write(`data: ${JSON.stringify({
+      type: 'completed',
+      message: 'HubSpot contacts migration completed',
+      summary: {
+        totalProcessed: state.totalProcessed,
+        totalCreated: state.totalCreated,
+        totalSkipped: state.totalSkipped,
+        totalErrors: state.totalErrors
+      },
+      errors: state.errors.slice(0, 50) // Return first 50 errors if any
+    })}\n\n`);
+
+    // Clean up after 1 minute
+    setTimeout(() => {
+      migrationState.delete(migrationId);
+    }, 60000);
+
+    res.end();
+  } catch (error) {
+    console.error('Migrate HubSpot contacts error:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    state.isCompleted = true;
+    migrationState.delete(migrationId);
+    res.end();
+  }
+};
+

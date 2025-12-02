@@ -7,7 +7,7 @@ import dealRoutes from './dealRoutes.js';
 import requirementRoutes from './requirementRoutes.js';
 import sourceRoutes from './sourceRoutes.js';
 import strategyRoutes from './strategyRoutes.js';
-import typeRoutes from './typeRoutes.js';   
+import typeRoutes from './typeRoutes.js';
 import categoryRoutes from './categoryRoutes.js'; // Import category routes
 import subCategoryRoutes from './subCategoryRoutes.js'; // Import sub-category routes
 import uploadRoutes from './uploadRoutes.js'; // Import upload routes
