@@ -106,3 +106,109 @@ export const clearMessages = async (req, res) => {
   }
 };
 
+/**
+ * Pin a chat message
+ * POST /api/webinars/:webinarId/chat/:messageId/pin
+ */
+export const pinMessage = async (req, res) => {
+  try {
+    const { webinarId, messageId } = req.params;
+
+    // Verify webinar exists
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Find and update the message
+    const message = await ChatMessage.findOne({ _id: messageId, webinar: webinarId });
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Pin the message
+    message.isPinned = true;
+    await message.save();
+
+    // Populate sender info for response
+    const populatedMessage = await ChatMessage.findById(message._id)
+      .populate('senderUserId', 'name email')
+      .lean();
+
+    res.status(200).json({
+      message: 'Message pinned successfully',
+      chatMessage: populatedMessage
+    });
+  } catch (error) {
+    console.error('Error pinning message:', error);
+    res.status(500).json({ message: 'Error pinning message' });
+  }
+};
+
+/**
+ * Unpin a chat message
+ * POST /api/webinars/:webinarId/chat/:messageId/unpin
+ */
+export const unpinMessage = async (req, res) => {
+  try {
+    const { webinarId, messageId } = req.params;
+
+    // Verify webinar exists
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Find and update the message
+    const message = await ChatMessage.findOne({ _id: messageId, webinar: webinarId });
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Unpin the message
+    message.isPinned = false;
+    await message.save();
+
+    res.status(200).json({
+      message: 'Message unpinned successfully'
+    });
+  } catch (error) {
+    console.error('Error unpinning message:', error);
+    res.status(500).json({ message: 'Error unpinning message' });
+  }
+};
+
+/**
+ * Get all pinned messages for a webinar
+ * GET /api/webinars/:webinarId/chat/pinned
+ */
+export const getPinnedMessages = async (req, res) => {
+  try {
+    const { webinarId } = req.params;
+
+    // Verify webinar exists
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Get all pinned messages for this webinar, sorted by creation time (newest first)
+    const pinnedMessages = await ChatMessage.find({ 
+      webinar: webinarId, 
+      isPinned: true 
+    })
+      .populate('senderUserId', 'name email')
+      .sort({ createdAt: -1 }) // Newest messages first
+      .lean();
+
+    res.status(200).json({
+      message: 'Pinned messages fetched successfully',
+      pinnedMessages,
+      count: pinnedMessages.length
+    });
+  } catch (error) {
+    console.error('Error fetching pinned messages:', error);
+    res.status(500).json({ message: 'Error fetching pinned messages' });
+  }
+};
+

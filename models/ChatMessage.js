@@ -25,6 +25,11 @@ const chatMessageSchema = new Schema({
     required: true,
     trim: true,
   },
+  isPinned: {
+    type: Boolean,
+    default: false,
+    index: true, // Index for faster queries of pinned messages
+  },
 }, {
   timestamps: true, // Adds createdAt and updatedAt automatically
 });
