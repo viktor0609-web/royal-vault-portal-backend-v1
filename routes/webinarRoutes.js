@@ -24,7 +24,10 @@ import {
 import {
   saveMessage,
   getMessages,
-  clearMessages
+  clearMessages,
+  pinMessage,
+  unpinMessage,
+  getPinnedMessages
 } from '../controllers/chatController.js';
 
 const router = express.Router();
@@ -43,6 +46,9 @@ router.delete('/:webinarId/unregister', protect, unregisterFromWebinar); // Unre
 router.post('/:webinarId/chat', saveMessage); // Save a chat message (public, but should include sender info)
 router.get('/:webinarId/chat', getMessages); // Get all chat messages for a webinar (public)
 router.delete('/:webinarId/chat', clearMessages); // Clear chat messages (admin only) but currently public
+router.get('/:webinarId/chat/pinned', getPinnedMessages); // Get all pinned messages for a webinar (public)
+router.post('/:webinarId/chat/:messageId/pin', pinMessage); // Pin a chat message (public)
+router.post('/:webinarId/chat/:messageId/unpin', unpinMessage); // Unpin a chat message (public)
 
 // ==================== ADMIN ROUTES ====================
 router.get('/admin', protect, authorize('admin'), getAllWebinars); // Get all webinars for admin
