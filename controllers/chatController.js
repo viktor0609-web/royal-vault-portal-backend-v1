@@ -1,5 +1,6 @@
 import ChatMessage from '../models/ChatMessage.js';
 import Webinar from '../models/Webinar.js';
+import mongoose from 'mongoose';
 
 /**
  * Save a chat message
@@ -93,6 +94,12 @@ export const clearMessages = async (req, res) => {
       return res.status(404).json({ message: 'Webinar not found' });
     }
 
+    // Unpin all messages first (set isPinned to false for all messages)
+    await ChatMessage.updateMany(
+      { webinar: webinarId, isPinned: true },
+      { $set: { isPinned: false } }
+    );
+
     // Delete all messages for this webinar
     const result = await ChatMessage.deleteMany({ webinar: webinarId });
 
@@ -118,6 +125,11 @@ export const pinMessage = async (req, res) => {
     const webinar = await Webinar.findById(webinarId);
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Check if messageId is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID. Message must be saved to database before pinning.' });
     }
 
     // Find and update the message
@@ -157,6 +169,11 @@ export const unpinMessage = async (req, res) => {
     const webinar = await Webinar.findById(webinarId);
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Check if messageId is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID' });
     }
 
     // Find and update the message
