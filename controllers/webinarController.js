@@ -24,9 +24,9 @@ export const getAllWebinars = async (req, res) => {
     }
 
     if (fields === 'basic') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay ctas createdAt';
+      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay ctas activeCtaIndices createdAt';
     } else if (fields === 'detailed') {
-      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite rawRecordingId ctas createdAt attendees';
+      selectFields = 'name slug date status streamType line1 line2 line3 displayComments portalDisplay calInvDesc proWorkId reminderSms proSms proSmsTime attendOverwrite rawRecordingId ctas activeCtaIndices createdAt attendees';
       populateFields = [
         { path: 'proSmsList', select: 'name' },
         { path: 'createdBy', select: 'name email' }
@@ -426,9 +426,9 @@ export const getPublicWebinars = async (req, res) => {
     }
 
     if (fields === 'basic') {
-      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees';
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas activeCtaIndices attendees';
     } else {
-      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas attendees recording';
+      selectFields = 'name slug date status streamType portalDisplay line1 line2 line3 displayComments ctas activeCtaIndices attendees recording';
       populateFields = [
         { path: 'createdBy', select: 'name email' }
       ];
@@ -657,3 +657,100 @@ export const getDownloadLink = async (req, res) => {
     res.status(500).json({ message: 'Error getting download link' });
   }
 }
+
+/**
+ * Activate a CTA (make it active/displayed)
+ * POST /api/webinars/:webinarId/cta/:ctaIndex/activate
+ */
+export const activateCta = async (req, res) => {
+  try {
+    const { webinarId, ctaIndex } = req.params;
+    const index = parseInt(ctaIndex, 10);
+
+    if (isNaN(index) || index < 0) {
+      return res.status(400).json({ message: 'Invalid CTA index' });
+    }
+
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Validate CTA index exists
+    if (!webinar.ctas || index >= webinar.ctas.length) {
+      return res.status(400).json({ message: 'CTA index out of range' });
+    }
+
+    // Add index to activeCtaIndices if not already present
+    if (!webinar.activeCtaIndices || !webinar.activeCtaIndices.includes(index)) {
+      webinar.activeCtaIndices = webinar.activeCtaIndices || [];
+      webinar.activeCtaIndices.push(index);
+      await webinar.save();
+    }
+
+    res.status(200).json({
+      message: 'CTA activated successfully',
+      activeCtaIndices: webinar.activeCtaIndices
+    });
+  } catch (error) {
+    console.error('Error activating CTA:', error);
+    res.status(500).json({ message: 'Error activating CTA' });
+  }
+};
+
+/**
+ * Deactivate a CTA (make it inactive/hidden)
+ * POST /api/webinars/:webinarId/cta/:ctaIndex/deactivate
+ */
+export const deactivateCta = async (req, res) => {
+  try {
+    const { webinarId, ctaIndex } = req.params;
+    const index = parseInt(ctaIndex, 10);
+
+    if (isNaN(index) || index < 0) {
+      return res.status(400).json({ message: 'Invalid CTA index' });
+    }
+
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Remove index from activeCtaIndices
+    if (webinar.activeCtaIndices && webinar.activeCtaIndices.includes(index)) {
+      webinar.activeCtaIndices = webinar.activeCtaIndices.filter(i => i !== index);
+      await webinar.save();
+    }
+
+    res.status(200).json({
+      message: 'CTA deactivated successfully',
+      activeCtaIndices: webinar.activeCtaIndices || []
+    });
+  } catch (error) {
+    console.error('Error deactivating CTA:', error);
+    res.status(500).json({ message: 'Error deactivating CTA' });
+  }
+};
+
+/**
+ * Get active CTA indices for a webinar
+ * GET /api/webinars/:webinarId/cta/active
+ */
+export const getActiveCtas = async (req, res) => {
+  try {
+    const { webinarId } = req.params;
+
+    const webinar = await Webinar.findById(webinarId).select('activeCtaIndices');
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    res.status(200).json({
+      message: 'Active CTAs fetched successfully',
+      activeCtaIndices: webinar.activeCtaIndices || []
+    });
+  } catch (error) {
+    console.error('Error fetching active CTAs:', error);
+    res.status(500).json({ message: 'Error fetching active CTAs' });
+  }
+};

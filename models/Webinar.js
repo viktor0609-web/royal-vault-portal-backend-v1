@@ -135,6 +135,12 @@ const webinarSchema = new Schema({
     },
   }],
 
+  // Active CTA indices (which CTAs are currently active/displayed)
+  activeCtaIndices: {
+    type: [Number],
+    default: [],
+  },
+
   // Registration and attendance tracking
   attendees: [{
     user: {

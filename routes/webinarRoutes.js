@@ -19,7 +19,11 @@ import {
   unregisterFromWebinar,
   isValidEmailAddress,
   setWebinarOnRecording,
-  getDownloadLink
+  getDownloadLink,
+  // CTA functions
+  activateCta,
+  deactivateCta,
+  getActiveCtas
 } from '../controllers/webinarController.js';
 import {
   saveMessage,
@@ -49,6 +53,11 @@ router.delete('/:webinarId/chat', clearMessages); // Clear chat messages (admin 
 router.get('/:webinarId/chat/pinned', getPinnedMessages); // Get all pinned messages for a webinar (public)
 router.post('/:webinarId/chat/:messageId/pin', pinMessage); // Pin a chat message (public)
 router.post('/:webinarId/chat/:messageId/unpin', unpinMessage); // Unpin a chat message (public)
+
+// ==================== CTA ROUTES ====================
+router.get('/:webinarId/cta/active', getActiveCtas); // Get active CTA indices for a webinar (public)
+router.post('/:webinarId/cta/:ctaIndex/activate', activateCta); // Activate a CTA (public)
+router.post('/:webinarId/cta/:ctaIndex/deactivate', deactivateCta); // Deactivate a CTA (public)
 
 // ==================== ADMIN ROUTES ====================
 router.get('/admin', protect, authorize('admin'), getAllWebinars); // Get all webinars for admin
