@@ -75,14 +75,21 @@ const dealSchema = new Schema(
       required: true,
     },
     displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
+    isRoyalVetted: { type: Boolean, default: false }, // Whether the deal is Royal Vetted
+    currentOffering: {
+      type: String,
+      enum: ['Open', 'Closed'],
+      default: null
+    }, // Current offering status: Open or Closed
   },
   {
     timestamps: true,
   }
 );
 
-// Add index for performance optimization
+// Add indexes for performance optimization
 dealSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
+dealSchema.index({ isRoyalVetted: 1 }); // Used for sorting Royal Vetted deals first
 
 const Deal = mongoose.model('Deal', dealSchema);
 
