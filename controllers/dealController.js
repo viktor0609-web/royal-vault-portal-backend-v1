@@ -382,32 +382,24 @@ export const starDeal = async (req, res) => {
 
     const { dealId } = req.params;
 
-    // Check if deal exists
-    const deal = await Deal.findById(dealId);
-    if (!deal) {
-      return res.status(404).json({ message: 'Deal not found' });
+    // Try to create favorite directly - faster than checking first
+    // MongoDB unique index will handle duplicates
+    try {
+      const favorite = new UserDealFavorite({
+        user: userId,
+        deal: dealId,
+      });
+      await favorite.save();
+      return res.status(200).json({ message: 'Deal starred successfully' });
+    } catch (saveError) {
+      // If duplicate (already starred), return success
+      if (saveError.code === 11000) {
+        return res.status(200).json({ message: 'Deal already starred' });
+      }
+      throw saveError; // Re-throw if it's a different error
     }
-
-    // Check if already starred
-    const existingFavorite = await UserDealFavorite.findOne({ user: userId, deal: dealId });
-    if (existingFavorite) {
-      return res.status(200).json({ message: 'Deal already starred', data: deal });
-    }
-
-    // Create favorite
-    const favorite = new UserDealFavorite({
-      user: userId,
-      deal: dealId,
-    });
-
-    await favorite.save();
-    return res.status(200).json({ message: 'Deal starred successfully', data: deal });
   } catch (error) {
     console.error(error);
-    if (error.code === 11000) {
-      // Duplicate key error (shouldn't happen due to check, but handle it)
-      return res.status(200).json({ message: 'Deal already starred' });
-    }
     return res.status(500).json({ message: 'Server Error', error });
   }
 };
