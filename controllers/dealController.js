@@ -243,11 +243,17 @@ export const filterDeals = async (req, res) => {
     const {
       name,
       categoryId,
+      categoryIds,
       subCategoryId,
+      subCategoryIds,
       typeId,
+      typeIds,
       strategyId,
+      strategyIds,
       requirementId,
+      requirementIds,
       sourceId,
+      sourceIds,
       createdBy,
       fields = 'basic',
       publicOnly = 'false',
@@ -266,12 +272,55 @@ export const filterDeals = async (req, res) => {
     if (name) {
       filter.name = { $regex: name, $options: 'i' }; // case-insensitive search
     }
-    if (categoryId) filter.category = categoryId;
-    if (subCategoryId) filter.subCategory = subCategoryId;
-    if (typeId) filter.type = typeId;
-    if (strategyId) filter.strategy = strategyId;
-    if (requirementId) filter.requirement = requirementId;
-    if (sourceId) filter.source = sourceId;
+    
+    // Handle category filters (support both single and array)
+    if (categoryIds) {
+      const ids = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
+      filter.category = { $in: ids };
+    } else if (categoryId) {
+      filter.category = categoryId;
+    }
+    
+    // Handle subCategory filters (support both single and array)
+    if (subCategoryIds) {
+      const ids = Array.isArray(subCategoryIds) ? subCategoryIds : [subCategoryIds];
+      filter.subCategory = { $in: ids };
+    } else if (subCategoryId) {
+      filter.subCategory = subCategoryId;
+    }
+    
+    // Handle type filters (support both single and array)
+    if (typeIds) {
+      const ids = Array.isArray(typeIds) ? typeIds : [typeIds];
+      filter.type = { $in: ids };
+    } else if (typeId) {
+      filter.type = typeId;
+    }
+    
+    // Handle strategy filters (support both single and array)
+    if (strategyIds) {
+      const ids = Array.isArray(strategyIds) ? strategyIds : [strategyIds];
+      filter.strategy = { $in: ids };
+    } else if (strategyId) {
+      filter.strategy = strategyId;
+    }
+    
+    // Handle requirement filters (support both single and array)
+    if (requirementIds) {
+      const ids = Array.isArray(requirementIds) ? requirementIds : [requirementIds];
+      filter.requirement = { $in: ids };
+    } else if (requirementId) {
+      filter.requirement = requirementId;
+    }
+    
+    // Handle source filters (support both single and array)
+    if (sourceIds) {
+      const ids = Array.isArray(sourceIds) ? sourceIds : [sourceIds];
+      filter.source = { $in: ids };
+    } else if (sourceId) {
+      filter.source = sourceId;
+    }
+    
     if (createdBy) filter.createdBy = createdBy;
     if (isRoyalVetted === 'true') filter.isRoyalVetted = true; // Filter for Royal Vetted deals
 
