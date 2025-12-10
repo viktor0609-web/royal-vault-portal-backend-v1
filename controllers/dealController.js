@@ -250,7 +250,8 @@ export const filterDeals = async (req, res) => {
       sourceId,
       createdBy,
       fields = 'basic',
-      publicOnly = 'false'
+      publicOnly = 'false',
+      isRoyalVetted
     } = req.query;
     const isPublicOnly = publicOnly === 'true';
 
@@ -272,6 +273,7 @@ export const filterDeals = async (req, res) => {
     if (requirementId) filter.requirement = requirementId;
     if (sourceId) filter.source = sourceId;
     if (createdBy) filter.createdBy = createdBy;
+    if (isRoyalVetted === 'true') filter.isRoyalVetted = true; // Filter for Royal Vetted deals
 
     let populateFields = [];
     if (fields === 'basic') {
