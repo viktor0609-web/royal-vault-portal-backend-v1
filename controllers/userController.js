@@ -399,14 +399,23 @@ export const resetUserPassword = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Generate reset token (same as forgotPassword)
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
-    await user.save();
+    // Check if user already has a valid reset token
+    let resetToken = user.resetPasswordToken;
+    let resetUrl;
+    
+    if (resetToken && user.resetPasswordExpire && user.resetPasswordExpire > Date.now()) {
+      // Use existing valid token
+      resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    } else {
+      // Generate new reset token (same as forgotPassword)
+      resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
+      await user.save();
+      resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    }
 
     // Send password reset email
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
     const templateId = process.env.PASSWORD_RESET_TEMPLATE_ID;
     const data = {
       firstName: user.firstName,
@@ -416,7 +425,10 @@ export const resetUserPassword = async (req, res) => {
     };
     await sendEmail(user.email, data, templateId);
 
-    return res.status(200).json({ message: 'Password reset email sent.' });
+    return res.status(200).json({ 
+      message: 'Password reset email sent.',
+      resetUrl: resetUrl
+    });
   } catch (error) {
     console.error('Reset user password error:', error);
     return res.status(500).json({ message: 'Server Error', error: error.message });
