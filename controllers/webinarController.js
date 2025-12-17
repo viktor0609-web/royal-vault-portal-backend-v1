@@ -671,26 +671,28 @@ export const activateCta = async (req, res) => {
       return res.status(400).json({ message: 'Invalid CTA index' });
     }
 
-    const webinar = await Webinar.findById(webinarId);
-    if (!webinar) {
+    // Validate webinar exists and CTA index is valid (lightweight check)
+    const webinarCheck = await Webinar.findById(webinarId).select('ctas');
+    if (!webinarCheck) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
 
     // Validate CTA index exists
-    if (!webinar.ctas || index >= webinar.ctas.length) {
+    if (!webinarCheck.ctas || index >= webinarCheck.ctas.length) {
       return res.status(400).json({ message: 'CTA index out of range' });
     }
 
-    // Add index to activeCtaIndices if not already present
-    if (!webinar.activeCtaIndices || !webinar.activeCtaIndices.includes(index)) {
-      webinar.activeCtaIndices = webinar.activeCtaIndices || [];
-      webinar.activeCtaIndices.push(index);
-      await webinar.save();
-    }
+    // Use atomic operation to add index to activeCtaIndices
+    // $addToSet prevents duplicates and is atomic
+    const updatedWebinar = await Webinar.findByIdAndUpdate(
+      webinarId,
+      { $addToSet: { activeCtaIndices: index } },
+      { new: true, runValidators: true }
+    ).select('activeCtaIndices');
 
     res.status(200).json({
       message: 'CTA activated successfully',
-      activeCtaIndices: webinar.activeCtaIndices
+      activeCtaIndices: updatedWebinar.activeCtaIndices || []
     });
   } catch (error) {
     console.error('Error activating CTA:', error);
@@ -711,20 +713,21 @@ export const deactivateCta = async (req, res) => {
       return res.status(400).json({ message: 'Invalid CTA index' });
     }
 
-    const webinar = await Webinar.findById(webinarId);
-    if (!webinar) {
-      return res.status(404).json({ message: 'Webinar not found' });
-    }
+    // Use atomic operation to remove index from activeCtaIndices
+    // $pull removes all occurrences and is atomic
+    const updatedWebinar = await Webinar.findByIdAndUpdate(
+      webinarId,
+      { $pull: { activeCtaIndices: index } },
+      { new: true, runValidators: true }
+    ).select('activeCtaIndices');
 
-    // Remove index from activeCtaIndices
-    if (webinar.activeCtaIndices && webinar.activeCtaIndices.includes(index)) {
-      webinar.activeCtaIndices = webinar.activeCtaIndices.filter(i => i !== index);
-      await webinar.save();
+    if (!updatedWebinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
     }
 
     res.status(200).json({
       message: 'CTA deactivated successfully',
-      activeCtaIndices: webinar.activeCtaIndices || []
+      activeCtaIndices: updatedWebinar.activeCtaIndices || []
     });
   } catch (error) {
     console.error('Error deactivating CTA:', error);
