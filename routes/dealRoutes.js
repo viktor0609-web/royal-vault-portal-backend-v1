@@ -11,11 +11,11 @@ import {
   unstarDeal,
 } from '../controllers/dealController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
-  
+
 const router = express.Router();
 
-router.get('/', protect, getAllDeals); // Get all deals
-router.get('/filter', protect, filterDeals); // Filter deals
+router.get('/', getAllDeals); // Get all deals
+router.get('/filter', filterDeals); // Filter deals
 router.get('/starred', protect, getStarredDeals); // Get user's starred deals
 router.get('/:dealId', protect, getDealById); // Get a deal by ID
 
