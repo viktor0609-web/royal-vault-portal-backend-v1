@@ -7,22 +7,28 @@ const HUBSPOT_API_BASE = 'https://api.hubapi.com/crm/v3';
 /**
  * Get user's orders (HubSpot Deals that are paid or refunded)
  * GET /api/orders
- * Note: Uses HubSpot Deals API (not Commerce Orders API which requires additional scopes)
  */
 export const getUserOrders = async (req, res) => {
   try {
+    // 1️⃣ Find user in DB
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
     if (!HUBSPOT_PRIVATE_API_KEY) {
       return res.status(500).json({ message: 'HubSpot API key not configured' });
     }
 
-    // Get HubSpot contact ID by email
-    const contactResponse = await axios.get(
-      `${HUBSPOT_API_BASE}/objects/contacts/${encodeURIComponent(user.email)}?idProperty=email&properties=hs_object_id`,
+    // 2️⃣ Get HubSpot contact ID by email using search API
+    const contactSearchResponse = await axios.post(
+      `${HUBSPOT_API_BASE}/objects/contacts/search`,
+      {
+        filterGroups: [
+          { filters: [{ propertyName: 'email', operator: 'EQ', value: user.email }] }
+        ],
+        properties: ['hs_object_id'],
+        limit: 1
+      },
       {
         headers: {
           Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
@@ -31,16 +37,16 @@ export const getUserOrders = async (req, res) => {
       }
     );
 
-    const contactId = contactResponse.data.id;
+    const contactId = contactSearchResponse.data.results?.[0]?.id;
+    if (!contactId) {
+      return res.status(404).json({ message: 'HubSpot contact not found' });
+    }
 
-    // Get deals associated with this contact using the associations API
-    // This is the correct way to get associated deals for a contact
+    // 3️⃣ Get deals associated with this contact
     const associationsResponse = await axios.get(
       `${HUBSPOT_API_BASE}/objects/contacts/${contactId}/associations/deals`,
       {
-        params: {
-          limit: 100,
-        },
+        params: { limit: 100 },
         headers: {
           Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
           'Content-Type': 'application/json',
@@ -49,16 +55,11 @@ export const getUserOrders = async (req, res) => {
     );
 
     const dealIds = (associationsResponse.data.results || []).map((assoc) => assoc.id);
-
     if (dealIds.length === 0) {
-      return res.status(200).json({
-        message: 'Orders fetched successfully',
-        orders: [],
-      });
+      return res.status(200).json({ message: 'Orders fetched successfully', orders: [] });
     }
 
-    // Fetch deal details - use search API with IN filter for deal IDs
-    // HubSpot search API supports filtering by hs_object_id with IN operator
+    // 4️⃣ Fetch deal details in batch
     const dealsBatchResponse = await axios.post(
       `${HUBSPOT_API_BASE}/objects/deals/batch/read`,
       {
@@ -76,47 +77,121 @@ export const getUserOrders = async (req, res) => {
 
     const allDeals = dealsBatchResponse.data.results || [];
 
-    // Filter for paid or refunded deals
-    // Only include deals that have a close date (indicating they're closed/completed)
-    const orders = allDeals
-      .filter((deal) => {
-        // Only include deals that are closed (have a close date)
-        // This ensures we only show completed/paid deals, not open opportunities
-        return deal.properties?.closedate;
-      })
-      .map((deal) => {
-        // Determine status based on dealstage
-        // HubSpot stages can be IDs or labels, so we check both patterns
-        const stage = (deal.properties?.dealstage || '').toLowerCase();
+    console.log('allDeals', allDeals);
 
-        // Common patterns: "closedwon" = paid, "closedlost" = refunded
-        // Adjust these based on your actual HubSpot pipeline stage names/IDs
-        const isPaid = stage.includes('won') ||
-          (stage.includes('paid') && !stage.includes('refunded')) ||
-          (!stage.includes('lost') && !stage.includes('refunded') && deal.properties?.closedate);
+    // 5️⃣ Fetch payments associated with the contact
+    let paymentsByDealId = {};
+    try {
+      const paymentsAssocResponse = await axios.get(
+        `${HUBSPOT_API_BASE}/objects/contacts/${contactId}/associations/commerce_payments`,
+        {
+          params: { limit: 100 },
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const paymentIds = (paymentsAssocResponse.data.results || []).map((assoc) => assoc.id);
+
+      if (paymentIds.length > 0) {
+        const paymentsBatchResponse = await axios.post(
+          `${HUBSPOT_API_BASE}/objects/commerce_payments/batch/read`,
+          {
+            propertiesWithHistory: [],
+            properties: ['hs_initial_amount', 'hs_payment_status', 'hs_initiated_date', 'hs_object_id', 'hs_payment_method_last_4'],
+            inputs: paymentIds.map((id) => ({ id })),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const allPayments = paymentsBatchResponse.data.results || [];
+
+        console.log('allPayments -->', allPayments);
+
+        // 6️⃣ Map payments to all associated deals
+        await Promise.all(
+          allPayments.map(async (payment) => {
+            try {
+
+
+              const dealAssocResponse = await axios.get(
+                `${HUBSPOT_API_BASE}/objects/commerce_payments/${payment.id}/associations/deals`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+
+              const paymentDealIds = (dealAssocResponse.data.results || []).map((assoc) =>
+                String(assoc.id)
+              );
+
+              // Get last 4 digits from payment property (directly available on payment object)
+              const last4 = payment.properties?.hs_payment_method_last_4 || '****';
+
+              const mappedPayment = {
+                id: payment.id,
+                paymentId: payment.properties?.hs_object_id,
+                paymentNumber: `#${paymentIds.indexOf(payment.id) + 1}`,
+                amount: payment.properties?.hs_initial_amount || '0',
+                status: payment.properties?.hs_payment_status || '',
+                createDate: payment.properties?.hs_initiated_date,
+                last4: last4,
+                dealIds: paymentDealIds,
+              };
+
+              paymentDealIds.forEach((dealId) => {
+                if (!paymentsByDealId[dealId]) paymentsByDealId[dealId] = [];
+                paymentsByDealId[dealId].push(mappedPayment);
+              });
+            } catch (assocError) {
+              console.warn('Payment association error:', assocError.message);
+            }
+          })
+        );
+
+        // Sort payments per deal (newest first)
+        Object.keys(paymentsByDealId).forEach((dealId) => {
+          paymentsByDealId[dealId].sort(
+            (a, b) => new Date(b.createDate).getTime() - new Date(a.createDate).getTime()
+          );
+        });
+      }
+    } catch (paymentError) {
+      console.warn('Commerce Payments API error:', paymentError.response?.data || paymentError.message);
+    }
+
+    // 7️⃣ Map deals to orders
+    const orders = allDeals
+      .filter((deal) => deal.properties?.closedate) // only closed deals
+      .map((deal) => {
+        const dealInternalId = String(deal.id);
+        const orderPayments = paymentsByDealId[dealInternalId] || [];
 
         return {
           id: deal.id,
           dealId: deal.properties?.hs_object_id,
           name: deal.properties?.dealname || 'Unnamed Deal',
           amount: deal.properties?.amount || '0',
-          status: isPaid ? 'Paid' : 'Refunded',
+          status: deal.properties?.dealstage || '',
           dealStage: deal.properties?.dealstage,
           closeDate: deal.properties?.closedate,
           createDate: deal.properties?.createdate,
+          payments: orderPayments,
         };
       })
-      .sort((a, b) => {
-        // Sort newest first
-        const dateA = new Date(a.createDate || 0).getTime();
-        const dateB = new Date(b.createDate || 0).getTime();
-        return dateB - dateA;
-      });
+      .sort((a, b) => new Date(b.createDate).getTime() - new Date(a.createDate).getTime());
 
-    res.status(200).json({
-      message: 'Orders fetched successfully',
-      orders,
-    });
+    res.status(200).json({ message: 'Orders fetched successfully', orders });
   } catch (error) {
     console.error('Error fetching orders:', error.response?.data || error.message);
     res.status(500).json({
@@ -125,6 +200,7 @@ export const getUserOrders = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Get payments for a specific deal or all payments for user
@@ -200,7 +276,7 @@ export const getPayments = async (req, res) => {
       );
 
       const allPayments = paymentsBatchResponse.data.results || [];
-      console.log(allPayments);
+      console.log('allPayments', allPayments);
 
 
       // Get associations for each payment to find linked deals/orders
@@ -220,7 +296,7 @@ export const getPayments = async (req, res) => {
 
             const dealIds = (dealAssocResponse.data.results || []).map((assoc) => assoc.id);
 
-            console.log(dealIds);
+            console.log('dealIds', dealIds);
 
             return {
               ...payment,
@@ -234,6 +310,8 @@ export const getPayments = async (req, res) => {
           }
         })
       );
+
+      console.log('paymentsWithAssociations', paymentsWithAssociations);
 
       payments = paymentsWithAssociations
         .filter((payment) => {
@@ -293,6 +371,7 @@ export const getPayments = async (req, res) => {
  */
 export const getSubscriptions = async (req, res) => {
   try {
+    // 1️⃣ Find user in DB
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -302,9 +381,16 @@ export const getSubscriptions = async (req, res) => {
       return res.status(500).json({ message: 'HubSpot API key not configured' });
     }
 
-    // Get HubSpot contact ID
-    const contactResponse = await axios.get(
-      `${HUBSPOT_API_BASE}/objects/contacts/${encodeURIComponent(user.email)}?idProperty=email&properties=hs_object_id`,
+    // 2️⃣ Get HubSpot contact ID by email using search API
+    const contactSearchResponse = await axios.post(
+      `${HUBSPOT_API_BASE}/objects/contacts/search`,
+      {
+        filterGroups: [
+          { filters: [{ propertyName: 'email', operator: 'EQ', value: user.email }] }
+        ],
+        properties: ['hs_object_id'],
+        limit: 1
+      },
       {
         headers: {
           Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
@@ -313,19 +399,22 @@ export const getSubscriptions = async (req, res) => {
       }
     );
 
-    const contactId = contactResponse.data.id;
+    const contactId = contactSearchResponse.data.results?.[0]?.id;
+    if (!contactId) {
+      return res.status(200).json({
+        message: 'Subscriptions fetched successfully',
+        subscriptions: [],
+      });
+    }
 
-    // Use HubSpot's Subscriptions API
+    // 3️⃣ Get subscriptions associated with the contact
     let subscriptions = [];
 
     try {
-      // Get subscriptions associated with the contact via associations API
       const subscriptionsAssocResponse = await axios.get(
         `${HUBSPOT_API_BASE}/objects/contacts/${contactId}/associations/subscriptions`,
         {
-          params: {
-            limit: 100,
-          },
+          params: { limit: 100 },
           headers: {
             Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
             'Content-Type': 'application/json',
@@ -342,12 +431,12 @@ export const getSubscriptions = async (req, res) => {
         });
       }
 
-      // Fetch subscription details using batch read
+      // 4️⃣ Fetch subscription details using batch read
       const subscriptionsBatchResponse = await axios.post(
         `${HUBSPOT_API_BASE}/objects/subscriptions/batch/read`,
         {
           propertiesWithHistory: [],
-          properties: ['hs_status', 'hs_last_payment_amount', 'hs_next_billing_date', 'hs_object_id'],
+          properties: ['hs_name', 'hs_status', 'hs_last_payment_amount', 'hs_next_billing_date', 'hs_next_payment_due_date', 'hs_recurring_billing_start_date', 'hs_object_id'],
           inputs: subscriptionIds.map((id) => ({ id })),
         },
         {
@@ -360,15 +449,15 @@ export const getSubscriptions = async (req, res) => {
 
       const allSubscriptions = subscriptionsBatchResponse.data.results || [];
 
-      // Get last 4 digits from payment method (if available)
+      // 5️⃣ Get last 4 digits from associated payments
       subscriptions = await Promise.all(
         allSubscriptions.map(async (subscription) => {
           let last4 = '****';
 
-          // Try to get payment method information via associations
           try {
-            const paymentMethodAssocResponse = await axios.get(
-              `${HUBSPOT_API_BASE}/objects/subscriptions/${subscription.id}/associations/payment_methods`,
+            // Get payments associated with this subscription
+            const paymentsAssocResponse = await axios.get(
+              `${HUBSPOT_API_BASE}/objects/subscriptions/${subscription.id}/associations/commerce_payments`,
               {
                 headers: {
                   Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
@@ -377,50 +466,45 @@ export const getSubscriptions = async (req, res) => {
               }
             );
 
-            const paymentMethodIds = (paymentMethodAssocResponse.data.results || []).map((assoc) => assoc.id);
+            const paymentIds = (paymentsAssocResponse.data.results || []).map((assoc) => assoc.id);
 
-            // If we have payment methods, try to get last 4 from the first one
-            if (paymentMethodIds.length > 0) {
-              try {
-                const paymentMethodResponse = await axios.get(
-                  `${HUBSPOT_API_BASE}/objects/payment_methods/${paymentMethodIds[0]}?properties=last_4,hs_last_4`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
-                      'Content-Type': 'application/json',
-                    },
-                  }
-                );
+            if (paymentIds.length > 0) {
+              // Fetch payment details to get last4
+              const paymentResponse = await axios.post(
+                `${HUBSPOT_API_BASE}/objects/commerce_payments/batch/read`,
+                {
+                  propertiesWithHistory: [],
+                  properties: ['hs_payment_method_last_4'],
+                  inputs: paymentIds.slice(0, 1).map((id) => ({ id })), // Just get the first payment
+                },
+                {
+                  headers: {
+                    Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
 
-                last4 = paymentMethodResponse.data.properties?.last_4 ||
-                  paymentMethodResponse.data.properties?.hs_last_4 ||
-                  '****';
-              } catch (pmError) {
-                // Payment method details not available
-              }
+              const payment = paymentResponse.data.results?.[0];
+              last4 = payment?.properties?.hs_payment_method_last_4 || '****';
             }
-          } catch (pmAssocError) {
-            // Payment method association might not be available
+          } catch (error) {
+            console.warn('Subscription payment association error:', error.response?.data || error.message);
           }
 
           return {
             id: subscription.id,
+            name: subscription.properties?.hs_name || '',
             subscriptionId: subscription.properties?.hs_object_id,
-            status: subscription.properties?.hs_status || 'Unknown',
+            status: subscription.properties?.hs_status || '',
             last4: last4,
-            nextBillingDate: subscription.properties?.hs_next_billing_date,
+            amount: subscription.properties?.hs_last_payment_amount || '0',
+            nextBillingDate: subscription.properties?.hs_next_payment_due_date || subscription.properties?.hs_next_billing_date,
           };
         })
       );
-
-      subscriptions = subscriptions.sort((a, b) => {
-        // Sort active subscriptions first
-        if (a.status.toLowerCase() === 'active' && b.status.toLowerCase() !== 'active') return -1;
-        if (a.status.toLowerCase() !== 'active' && b.status.toLowerCase() === 'active') return 1;
-        return 0;
-      });
     } catch (error) {
-      console.log('Subscriptions API error:', error.response?.data || error.message);
+      console.warn('Subscriptions API error:', error.response?.data || error.message);
       subscriptions = [];
     }
 
