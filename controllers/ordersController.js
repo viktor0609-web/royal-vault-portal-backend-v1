@@ -79,6 +79,36 @@ export const getUserOrders = async (req, res) => {
 
     console.log('allDeals', allDeals);
 
+    // 5️⃣ Get pipeline stages to map stage IDs to names
+    const stageIdToNameMap = {};
+    try {
+      const pipelinesResponse = await axios.get(
+        'https://api.hubapi.com/crm-pipelines/v1/pipelines/deals',
+        {
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      // Map all stage IDs to their labels across all pipelines
+      if (pipelinesResponse.data && Array.isArray(pipelinesResponse.data.results)) {
+        pipelinesResponse.data.results.forEach((pipeline) => {
+          if (pipeline.stages && Array.isArray(pipeline.stages)) {
+            pipeline.stages.forEach((stage) => {
+              if (stage.stageId && stage.label) {
+                stageIdToNameMap[stage.stageId] = stage.label;
+              }
+            });
+          }
+        });
+      }
+    } catch (pipelineError) {
+      console.warn('Pipeline stages fetch error:', pipelineError.response?.data || pipelineError.message);
+      // Continue without stage names if pipeline fetch fails
+    }
+
     // 5️⃣ Fetch payments associated with the contact
     let paymentsByDealId = {};
     try {
@@ -170,6 +200,8 @@ export const getUserOrders = async (req, res) => {
       console.warn('Commerce Payments API error:', paymentError.response?.data || paymentError.message);
     }
 
+    console.log('allDealsd -->', allDeals);
+
     // 7️⃣ Map deals to orders
     const orders = allDeals
       .filter((deal) => deal.properties?.closedate) // only closed deals
@@ -177,13 +209,16 @@ export const getUserOrders = async (req, res) => {
         const dealInternalId = String(deal.id);
         const orderPayments = paymentsByDealId[dealInternalId] || [];
 
+        const dealStageId = deal.properties?.dealstage || '';
+        const dealStageName = stageIdToNameMap[dealStageId] || dealStageId || '';
+
         return {
           id: deal.id,
           dealId: deal.properties?.hs_object_id,
           name: deal.properties?.dealname || 'Unnamed Deal',
           amount: deal.properties?.amount || '0',
-          status: deal.properties?.dealstage || '',
-          dealStage: deal.properties?.dealstage,
+          status: dealStageName,
+          dealStage: dealStageName,
           closeDate: deal.properties?.closedate,
           createDate: deal.properties?.createdate,
           payments: orderPayments,
