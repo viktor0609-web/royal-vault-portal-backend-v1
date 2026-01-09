@@ -165,6 +165,15 @@ const webinarSchema = new Schema({
     ref: 'User',
     required: true,
   },
+
+  // Reminder email tracking
+  reminderEmailSent: {
+    type: Boolean,
+    default: false,
+  },
+  reminderEmailSentAt: {
+    type: Date,
+  },
 }, {
   timestamps: true,
 });

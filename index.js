@@ -7,6 +7,7 @@ import routes from './routes/index.js';
 import { errorHandler } from './utils/errors.js';
 import { WebinarOnRecording } from './models/Webinar.js';
 import Webinar from './models/Webinar.js';
+import { startWebinarReminderCron } from './services/webinarReminderService.js';
 
 dotenv.config();
 connectDB();
@@ -103,6 +104,9 @@ app.use('*', (req, res) => {
 
 // Global error handler (must be last)
 app.use(errorHandler);
+
+// Start webinar reminder cron job
+startWebinarReminderCron();
 
 const port = process.env.PORT || 5000;
 

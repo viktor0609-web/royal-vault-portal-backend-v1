@@ -3,6 +3,7 @@ import Webinar from '../models/Webinar.js';
 import mongoose from 'mongoose';
 import { WebinarOnRecording } from '../models/Webinar.js';
 import sendEmail from '../utils/sendEmail.js';
+import { sendWebinarReminder } from '../services/webinarReminderService.js';
 
 // ==================== ADMIN FUNCTIONS ====================
 
@@ -755,5 +756,59 @@ export const getActiveCtas = async (req, res) => {
   } catch (error) {
     console.error('Error fetching active CTAs:', error);
     res.status(500).json({ message: 'Error fetching active CTAs' });
+  }
+};
+
+/**
+ * Test endpoint to manually trigger reminder emails for a webinar
+ * POST /api/webinars/admin/:webinarId/test-reminder
+ * Admin only
+ * Note: This bypasses the reminderEmailSent check to allow testing
+ */
+export const testSendReminder = async (req, res) => {
+  try {
+    const { webinarId } = req.params;
+    const webinar = await Webinar.findById(webinarId);
+    
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+    
+    // Store original status
+    const originalReminderStatus = webinar.reminderEmailSent;
+    const originalReminderSentAt = webinar.reminderEmailSentAt;
+    
+    // Temporarily reset reminder status for testing
+    webinar.reminderEmailSent = false;
+    webinar.reminderEmailSentAt = undefined;
+    
+    // Populate attendees before calling the service
+    await webinar.populate({
+      path: 'attendees.user',
+      select: 'firstName lastName email'
+    });
+    
+    // Call the reminder service (it will set reminderEmailSent to true after sending and save the webinar)
+    await sendWebinarReminder(webinar);
+    
+    // Reload webinar to get updated status after save
+    const updatedWebinar = await Webinar.findById(webinarId);
+    
+    res.status(200).json({ 
+      message: 'Test reminder sent successfully',
+      webinar: {
+        _id: updatedWebinar._id,
+        name: updatedWebinar.name,
+        reminderEmailSent: updatedWebinar.reminderEmailSent,
+        reminderEmailSentAt: updatedWebinar.reminderEmailSentAt,
+        previousStatus: {
+          reminderEmailSent: originalReminderStatus,
+          reminderEmailSentAt: originalReminderSentAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error sending test reminder:', error);
+    res.status(500).json({ message: 'Error sending test reminder', error: error.message });
   }
 };
