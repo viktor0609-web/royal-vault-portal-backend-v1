@@ -3,8 +3,10 @@ import {
   getUserOrders,
   getPayments,
   getSubscriptions,
+  getAdminUserOrders,
+  getAdminUserSubscriptions,
 } from '../controllers/ordersController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -19,6 +21,12 @@ router.get('/payments', getPayments);
 
 // Get subscriptions
 router.get('/subscriptions', getSubscriptions);
+
+// Admin routes - Get orders for a specific user
+router.get('/admin/:userId', authorize('admin'), getAdminUserOrders);
+
+// Admin routes - Get subscriptions for a specific user
+router.get('/admin/:userId/subscriptions', authorize('admin'), getAdminUserSubscriptions);
 
 export default router;
 
