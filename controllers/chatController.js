@@ -209,13 +209,13 @@ export const getPinnedMessages = async (req, res) => {
       return res.status(404).json({ message: 'Webinar not found' });
     }
 
-    // Get all pinned messages for this webinar, sorted by creation time (newest first)
+    // Get all pinned messages for this webinar, sorted by creation time (oldest first, newest at bottom)
     const pinnedMessages = await ChatMessage.find({ 
       webinar: webinarId, 
       isPinned: true 
     })
       .populate('senderUserId', 'name email')
-      .sort({ createdAt: -1 }) // Newest messages first
+      .sort({ createdAt: 1 }) // Oldest messages first, newest at bottom
       .lean();
 
     res.status(200).json({
