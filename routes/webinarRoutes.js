@@ -67,7 +67,7 @@ router.post('/admin', protect, authorize('admin'), createWebinar); // Create a n
 router.put('/admin/:webinarId', protect, authorize('admin'), updateWebinar); // Update an existing webinar
 router.delete('/admin/:webinarId', protect, authorize('admin'), deleteWebinar); // Delete a webinar
 router.post('/admin/:webinarId/end', protect, authorize('admin'), endWebinar); // End/Finish a webinar
-router.get('/admin/:webinarId/attendees', viewAttendees); // View all attendees for a specific webinar
+router.get('/admin/:webinarId/attendees', protect, authorize('admin'), viewAttendees); // View all attendees for a specific webinar
 router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended); // Mark a user as attended for a specific webinar
 router.post('/admin/:webinarId/user/:userId/missed', protect, authorize('admin'), adminMarkAsMissed); // Mark a user as missed for a specific webinar
 router.post('/admin/:webinarId/test-reminder', protect, authorize('admin'), testSendReminder); // Test reminder email (admin only)

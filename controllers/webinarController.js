@@ -337,7 +337,11 @@ export const viewAttendees = async (req, res) => {
   try {
     const { webinarId } = req.params;
 
-    const webinar = await Webinar.findById(webinarId);
+    const webinar = await Webinar.findById(webinarId)
+      .populate({
+        path: 'attendees.user',
+        select: 'firstName lastName email phone'
+      });
 
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
