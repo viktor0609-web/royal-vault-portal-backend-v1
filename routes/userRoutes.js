@@ -11,7 +11,7 @@ import {
   getUserStatistics,
   bulkUpdateUsers,
   bulkDeleteUsers,
-  migrateHubSpotContacts,
+  // migrateHubSpotContacts, // Commented out - feature disabled
 } from '../controllers/userController.js';
 import { protect, authorize, authorizeSupaadmin } from '../middleware/authMiddleware.js';
 
@@ -21,10 +21,11 @@ const router = express.Router();
 router.use(protect);
 
 // Migrate HubSpot contacts to database (Supaadmin only) - SSE endpoint
-router.get('/migrate/hubspot', authorizeSupaadmin(), migrateHubSpotContacts);
-router.get('/migrate/hubspot/pause', authorizeSupaadmin(), migrateHubSpotContacts);
-router.get('/migrate/hubspot/resume', authorizeSupaadmin(), migrateHubSpotContacts);
-router.get('/migrate/hubspot/status', authorizeSupaadmin(), migrateHubSpotContacts);
+// Commented out - feature disabled
+// router.get('/migrate/hubspot', authorizeSupaadmin(), migrateHubSpotContacts);
+// router.get('/migrate/hubspot/pause', authorizeSupaadmin(), migrateHubSpotContacts);
+// router.get('/migrate/hubspot/resume', authorizeSupaadmin(), migrateHubSpotContacts);
+// router.get('/migrate/hubspot/status', authorizeSupaadmin(), migrateHubSpotContacts);
 
 // Statistics route (Supaadmin only)
 router.get('/statistics', authorizeSupaadmin(), getUserStatistics);

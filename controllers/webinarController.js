@@ -384,32 +384,6 @@ export const adminMarkAsAttended = async (req, res) => {
   }
 };
 
-// Admin marks a user as missed for a webinar
-export const adminMarkAsMissed = async (req, res) => {
-  try {
-    const { userId, webinarId } = req.params;
-
-    const webinar = await Webinar.findById(webinarId);
-    if (!webinar) {
-      return res.status(404).json({ message: 'Webinar not found' });
-    }
-
-    // Find the user in the attendees list
-    const attendee = webinar.attendees.find((attendee) => attendee.user.toString() === userId);
-    if (!attendee) {
-      return res.status(400).json({ message: 'User is not registered for this webinar' });
-    }
-
-    // Mark the user as missed
-    attendee.attendanceStatus = 'missed';
-    await webinar.save();
-
-    res.status(200).json({ message: 'User marked as missed for the webinar' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error marking user as missed' });
-  }
-};
 
 // ==================== USER FUNCTIONS ====================
 
@@ -574,6 +548,48 @@ export const markAsAttended = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error marking attendance' });
+  }
+};
+
+// Mark user as watched (user side) - only if not already attended
+// If user is not registered, they will be automatically registered and marked as watched
+export const markAsWatched = async (req, res) => {
+  try {
+    const userId = req.user._id; // Get user ID from the user object
+    const { webinarId } = req.params;
+
+    // Find the webinar
+    const webinar = await Webinar.findById(webinarId);
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    // Find the user in the attendees list
+    let attendee = webinar.attendees.find((attendee) => attendee.user.toString() === userId);
+
+    // If user is not registered, add them to attendees with 'watched' status
+    if (!attendee) {
+      webinar.attendees.push({
+        user: userId,
+        attendanceStatus: 'watched',
+        registeredAt: new Date()
+      });
+      await webinar.save();
+      return res.status(200).json({ message: 'You have been marked as watched' });
+    }
+
+    // User is already registered - only update to 'watched' if status is not already 'attended'
+    // 'attended' takes precedence and should not be overwritten
+    if (attendee.attendanceStatus !== 'attended') {
+      attendee.attendanceStatus = 'watched';
+      await webinar.save();
+      res.status(200).json({ message: 'You have been marked as watched' });
+    } else {
+      res.status(200).json({ message: 'Status remains as attended' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error marking as watched' });
   }
 };
 
@@ -773,32 +789,32 @@ export const testSendReminder = async (req, res) => {
   try {
     const { webinarId } = req.params;
     const webinar = await Webinar.findById(webinarId);
-    
+
     if (!webinar) {
       return res.status(404).json({ message: 'Webinar not found' });
     }
-    
+
     // Store original status
     const originalReminderStatus = webinar.reminderEmailSent;
     const originalReminderSentAt = webinar.reminderEmailSentAt;
-    
+
     // Temporarily reset reminder status for testing
     webinar.reminderEmailSent = false;
     webinar.reminderEmailSentAt = undefined;
-    
+
     // Populate attendees before calling the service
     await webinar.populate({
       path: 'attendees.user',
       select: 'firstName lastName email'
     });
-    
+
     // Call the reminder service (it will set reminderEmailSent to true after sending and save the webinar)
     await sendWebinarReminder(webinar);
-    
+
     // Reload webinar to get updated status after save
     const updatedWebinar = await Webinar.findById(webinarId);
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       message: 'Test reminder sent successfully',
       webinar: {
         _id: updatedWebinar._id,

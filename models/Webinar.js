@@ -150,7 +150,7 @@ const webinarSchema = new Schema({
     },
     attendanceStatus: {
       type: String,
-      enum: ['registered', 'attended', 'missed'],
+      enum: ['registered', 'attended', 'watched'],
       default: 'registered',
     },
     registeredAt: {

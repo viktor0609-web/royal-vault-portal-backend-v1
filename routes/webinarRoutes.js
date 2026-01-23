@@ -10,12 +10,12 @@ import {
   endWebinar,
   viewAttendees,
   adminMarkAsAttended,
-  adminMarkAsMissed,
   // User functions
   getPublicWebinars,
   getPublicWebinarById,
   registerForWebinar,
   markAsAttended,
+  markAsWatched,
   unregisterFromWebinar,
   isValidEmailAddress,
   setWebinarOnRecording,
@@ -45,6 +45,7 @@ router.post('/isValidEmailAddress', isValidEmailAddress);
 // ==================== USER ROUTES ====================
 router.post('/:webinarId/register', protect, registerForWebinar); // Register user for a webinar
 router.post('/:webinarId/attend', protect, markAsAttended); // Mark user as attended for a webinar
+router.post('/:webinarId/watch', protect, markAsWatched); // Mark user as watched for a webinar (only if not already attended)
 router.delete('/:webinarId/unregister', protect, unregisterFromWebinar); // Unregister user from a webinar
 
 // ==================== CHAT ROUTES ====================
@@ -69,7 +70,6 @@ router.delete('/admin/:webinarId', protect, authorize('admin'), deleteWebinar); 
 router.post('/admin/:webinarId/end', protect, authorize('admin'), endWebinar); // End/Finish a webinar
 router.get('/admin/:webinarId/attendees', protect, authorize('admin'), viewAttendees); // View all attendees for a specific webinar
 router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended); // Mark a user as attended for a specific webinar
-router.post('/admin/:webinarId/user/:userId/missed', protect, authorize('admin'), adminMarkAsMissed); // Mark a user as missed for a specific webinar
 router.post('/admin/:webinarId/test-reminder', protect, authorize('admin'), testSendReminder); // Test reminder email (admin only)
 router.post('/admin/:slug/on-recording', setWebinarOnRecording); // Set webinar on recording
 router.get('/admin/:rawRecordingId/download-link', getDownloadLink); // Get download link for a recording
