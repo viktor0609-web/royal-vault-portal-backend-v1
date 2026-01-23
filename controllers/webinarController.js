@@ -523,6 +523,7 @@ export const registerForWebinar = async (req, res) => {
 };
 
 // Mark user as attended (user side)
+// If user joins during "In Progress" meeting, they are automatically considered as attended
 export const markAsAttended = async (req, res) => {
   try {
     const userId = req.user._id; // Get user ID from the user object
@@ -535,7 +536,20 @@ export const markAsAttended = async (req, res) => {
     }
 
     // Find the user in the attendees list
-    const attendee = webinar.attendees.find((attendee) => attendee.user.toString() === userId);
+    let attendee = webinar.attendees.find((attendee) => attendee.user.toString() === userId);
+
+    // If user is not registered but webinar is "In Progress", register them and mark as attended
+    if (!attendee && webinar.status === 'In Progress') {
+      webinar.attendees.push({
+        user: userId,
+        attendanceStatus: 'attended',
+        registeredAt: new Date()
+      });
+      await webinar.save();
+      return res.status(200).json({ message: 'You have been registered and marked as attended' });
+    }
+
+    // If user is not registered and webinar is not "In Progress", return error
     if (!attendee) {
       return res.status(400).json({ message: 'User is not registered for this webinar' });
     }
