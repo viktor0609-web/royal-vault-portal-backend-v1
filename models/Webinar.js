@@ -174,6 +174,12 @@ const webinarSchema = new Schema({
   reminderEmailSentAt: {
     type: Date,
   },
+
+  // HubSpot list ID for webinar participants (create/update list when syncing)
+  hubSpotListId: {
+    type: String,
+    trim: true,
+  },
 }, {
   timestamps: true,
 });

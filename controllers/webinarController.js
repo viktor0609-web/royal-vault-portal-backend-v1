@@ -1,9 +1,12 @@
+import axios from 'axios';
 import User from '../models/User.js';
 import Webinar from '../models/Webinar.js';
 import mongoose from 'mongoose';
 import { WebinarOnRecording } from '../models/Webinar.js';
 import sendEmail from '../utils/sendEmail.js';
 import { sendWebinarReminder } from '../services/webinarReminderService.js';
+
+const HUBSPOT_API_BASE = 'https://api.hubapi.com/crm/v3';
 
 // ==================== ADMIN FUNCTIONS ====================
 
@@ -381,6 +384,148 @@ export const adminMarkAsAttended = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error marking user as attended' });
+  }
+};
+
+// Sync webinar attendees to a HubSpot list (create list if not exists, update membership if exists)
+export const syncAttendeesToHubSpot = async (req, res) => {
+  try {
+    const HUBSPOT_PRIVATE_API_KEY = process.env.HUBSPOT_PRIVATE_API_KEY;
+    if (!HUBSPOT_PRIVATE_API_KEY) {
+      return res.status(500).json({ message: 'HubSpot API key not configured' });
+    }
+
+    const { webinarId } = req.params;
+    const webinar = await Webinar.findById(webinarId)
+      .populate({
+        path: 'attendees.user',
+        select: 'firstName lastName email phone'
+      });
+
+    if (!webinar) {
+      return res.status(404).json({ message: 'Webinar not found' });
+    }
+
+    const attendees = webinar.attendees || [];
+    const contactsWithEmail = attendees
+      .map((a) => a.user)
+      .filter((u) => u && u.email);
+
+    if (contactsWithEmail.length === 0) {
+      return res.status(400).json({ message: 'No attendees with email to sync' });
+    }
+
+    const authHeader = { Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}` };
+
+    // Get or create HubSpot contact for each attendee; collect contact IDs
+    const contactIds = [];
+    for (const user of contactsWithEmail) {
+      const searchRes = await axios.post(
+        `${HUBSPOT_API_BASE}/objects/contacts/search`,
+        {
+          filterGroups: [{
+            filters: [{ propertyName: 'email', operator: 'EQ', value: user.email }]
+          }],
+          properties: ['email'],
+          limit: 1
+        },
+        { headers: { ...authHeader, 'Content-Type': 'application/json' } }
+      );
+      const results = searchRes.data?.results || [];
+      let contactId;
+      if (results.length > 0) {
+        contactId = String(results[0].id);
+      } else {
+        const createRes = await axios.post(
+          `${HUBSPOT_API_BASE}/objects/contacts`,
+          {
+            properties: {
+              email: user.email,
+              firstname: user.firstName || '',
+              lastname: user.lastName || '',
+              phone: user.phone || ''
+            }
+          },
+          { headers: { ...authHeader, 'Content-Type': 'application/json' } }
+        );
+        contactId = String(createRes.data.id);
+      }
+      contactIds.push(contactId);
+    }
+
+    const uniqueContactIds = [...new Set(contactIds)];
+    const listName = `Webinar: ${webinar.line1 || webinar.name} (${webinar.date ? new Date(webinar.date).toISOString().slice(0, 10) : 'participants'})`;
+
+    if (webinar.hubSpotListId) {
+      // List exists: get current members, then add/remove to match current attendees
+      const currentMemberIds = [];
+      let after = undefined;
+      do {
+        const url = `${HUBSPOT_API_BASE}/lists/${webinar.hubSpotListId}/memberships${after ? `?after=${after}` : ''}`;
+        const membersRes = await axios.get(url, { headers: authHeader });
+        const results = membersRes.data?.results || [];
+        results.forEach((r) => currentMemberIds.push(String(r.recordId)));
+        after = membersRes.data?.paging?.next?.after;
+      } while (after);
+
+      const toAdd = uniqueContactIds.filter((id) => !currentMemberIds.includes(id));
+      const toRemove = currentMemberIds.filter((id) => !uniqueContactIds.includes(id));
+
+      if (toAdd.length > 0 || toRemove.length > 0) {
+        await axios.put(
+          `${HUBSPOT_API_BASE}/lists/${webinar.hubSpotListId}/memberships/add-and-remove`,
+          { recordIdsToAdd: toAdd, recordIdsToRemove: toRemove },
+          { headers: { ...authHeader, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return res.status(200).json({
+        message: 'HubSpot list updated successfully',
+        listId: webinar.hubSpotListId,
+        added: toAdd.length,
+        removed: toRemove.length,
+        totalContacts: uniqueContactIds.length
+      });
+    }
+
+    // Create new list
+    const createListRes = await axios.post(
+      `${HUBSPOT_API_BASE}/lists`,
+      {
+        name: listName,
+        objectTypeId: '0-1',
+        processingType: 'MANUAL'
+      },
+      { headers: { ...authHeader, 'Content-Type': 'application/json' } }
+    );
+
+    const listPayload = createListRes.data.list || createListRes.data;
+    const newListId = String(listPayload?.listId || listPayload?.id || createListRes.data.listId || createListRes.data.id);
+    if (!newListId) {
+      return res.status(500).json({ message: 'HubSpot did not return a list ID' });
+    }
+
+    if (uniqueContactIds.length > 0) {
+      await axios.put(
+        `${HUBSPOT_API_BASE}/lists/${newListId}/memberships/add`,
+        uniqueContactIds,
+        { headers: { ...authHeader, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    webinar.hubSpotListId = newListId;
+    await webinar.save();
+
+    return res.status(200).json({
+      message: 'HubSpot list created and participants added',
+      listId: newListId,
+      totalContacts: uniqueContactIds.length
+    });
+  } catch (error) {
+    console.error('syncAttendeesToHubSpot error:', error.response?.data || error.message);
+    const status = error.response?.status || 500;
+    const message = error.response?.data?.message || error.response?.data?.error || error.message || 'Error syncing to HubSpot';
+    return res.status(status).json({ message: typeof message === 'string' ? message : JSON.stringify(message) });
   }
 };
 
