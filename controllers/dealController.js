@@ -55,10 +55,11 @@ export const getAllDeals = async (req, res) => {
     const { fields = 'basic', sortBy = 'name', order = 'asc', publicOnly = 'false' } = req.query;
     const isPublicOnly = publicOnly === 'true';
 
-    // Build query with public pages filter
+    // Build query with public pages filter; hide closed deals from client-facing display
     const query = {};
     if (isPublicOnly) {
       query.displayOnPublicPage = true;
+      query.currentOffering = { $ne: 'Closed' };
     }
 
     let populateFields = [];
@@ -165,6 +166,12 @@ export const getDealById = async (req, res) => {
       return res.status(404).json({ message: 'Deal not found' });
     }
 
+    // Hide closed deals from clients; admins can still view them
+    const isAdmin = req.user?.role === 'admin';
+    if (deal.currentOffering === 'Closed' && !isAdmin) {
+      return res.status(404).json({ message: 'Deal not found' });
+    }
+
     return res.status(200).json({ message: 'Deal fetched successfully', deal });
   } catch (error) {
     console.error(error);
@@ -264,15 +271,16 @@ export const filterDeals = async (req, res) => {
     const filter = {};
     console.log("req.query", req.query);
 
-    // Add public pages filter if needed
+    // Add public pages filter if needed; hide closed deals from client-facing display
     if (isPublicOnly) {
       filter.displayOnPublicPage = true;
+      filter.currentOffering = { $ne: 'Closed' };
     }
 
     if (name) {
       filter.name = { $regex: name, $options: 'i' }; // case-insensitive search
     }
-    
+
     // Handle category filters (support both single and array)
     if (categoryIds) {
       const ids = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
@@ -280,7 +288,7 @@ export const filterDeals = async (req, res) => {
     } else if (categoryId) {
       filter.category = categoryId;
     }
-    
+
     // Handle subCategory filters (support both single and array)
     if (subCategoryIds) {
       const ids = Array.isArray(subCategoryIds) ? subCategoryIds : [subCategoryIds];
@@ -288,7 +296,7 @@ export const filterDeals = async (req, res) => {
     } else if (subCategoryId) {
       filter.subCategory = subCategoryId;
     }
-    
+
     // Handle type filters (support both single and array)
     if (typeIds) {
       const ids = Array.isArray(typeIds) ? typeIds : [typeIds];
@@ -296,7 +304,7 @@ export const filterDeals = async (req, res) => {
     } else if (typeId) {
       filter.type = typeId;
     }
-    
+
     // Handle strategy filters (support both single and array)
     if (strategyIds) {
       const ids = Array.isArray(strategyIds) ? strategyIds : [strategyIds];
@@ -304,7 +312,7 @@ export const filterDeals = async (req, res) => {
     } else if (strategyId) {
       filter.strategy = strategyId;
     }
-    
+
     // Handle requirement filters (support both single and array)
     if (requirementIds) {
       const ids = Array.isArray(requirementIds) ? requirementIds : [requirementIds];
@@ -312,7 +320,7 @@ export const filterDeals = async (req, res) => {
     } else if (requirementId) {
       filter.requirement = requirementId;
     }
-    
+
     // Handle source filters (support both single and array)
     if (sourceIds) {
       const ids = Array.isArray(sourceIds) ? sourceIds : [sourceIds];
@@ -320,7 +328,7 @@ export const filterDeals = async (req, res) => {
     } else if (sourceId) {
       filter.source = sourceId;
     }
-    
+
     if (createdBy) filter.createdBy = createdBy;
     if (isRoyalVetted === 'true') filter.isRoyalVetted = true; // Filter for Royal Vetted deals
 
@@ -400,8 +408,11 @@ export const getStarredDeals = async (req, res) => {
       ];
     }
 
-    // Fetch the deals
-    const deals = await Deal.find({ _id: { $in: dealIds } })
+    // Fetch the deals; hide closed deals from client-facing starred list
+    const deals = await Deal.find({
+      _id: { $in: dealIds },
+      currentOffering: { $ne: 'Closed' }
+    })
       .populate(populateFields)
       .lean();
 
