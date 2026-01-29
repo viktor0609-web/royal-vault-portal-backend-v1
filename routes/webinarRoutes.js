@@ -10,6 +10,7 @@ import {
   endWebinar,
   viewAttendees,
   adminMarkAsAttended,
+  syncAttendeesToHubSpot,
   // User functions
   getPublicWebinars,
   getPublicWebinarById,
@@ -69,6 +70,7 @@ router.put('/admin/:webinarId', protect, authorize('admin'), updateWebinar); // 
 router.delete('/admin/:webinarId', protect, authorize('admin'), deleteWebinar); // Delete a webinar
 router.post('/admin/:webinarId/end', protect, authorize('admin'), endWebinar); // End/Finish a webinar
 router.get('/admin/:webinarId/attendees', protect, authorize('admin'), viewAttendees); // View all attendees for a specific webinar
+router.post('/admin/:webinarId/attendees/sync-hubspot', protect, authorize('admin'), syncAttendeesToHubSpot); // Create or update HubSpot list with participants
 router.post('/admin/:webinarId/user/:userId/attend', protect, authorize('admin'), adminMarkAsAttended); // Mark a user as attended for a specific webinar
 router.post('/admin/:webinarId/test-reminder', protect, authorize('admin'), testSendReminder); // Test reminder email (admin only)
 router.post('/admin/:slug/on-recording', setWebinarOnRecording); // Set webinar on recording
