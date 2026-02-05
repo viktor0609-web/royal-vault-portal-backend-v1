@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import sendEmail from '../utils/sendEmail.js';
 import mongoose from 'mongoose';
+import { createViewAsCode } from '../utils/viewAsStore.js';
 
 // ======================== USER MANAGEMENT CONTROLLERS ========================
 
@@ -402,7 +403,7 @@ export const resetUserPassword = async (req, res) => {
     // Check if user already has a valid reset token
     let resetToken = user.resetPasswordToken;
     let resetUrl;
-    
+
     if (resetToken && user.resetPasswordExpire && user.resetPasswordExpire > Date.now()) {
       // Use existing valid token
       resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
@@ -425,7 +426,7 @@ export const resetUserPassword = async (req, res) => {
     };
     await sendEmail(user.email, data, templateId);
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       message: 'Password reset email sent.',
       resetUrl: resetUrl
     });
@@ -514,6 +515,39 @@ export const changeUserRole = async (req, res) => {
     });
   } catch (error) {
     console.error('Change user role error:', error);
+    return res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// Get "View as User" link (Supaadmin only) - returns URL to open in new tab
+export const getViewAsUserLink = async (req, res) => {
+  if (!isSupaadmin(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Only supaadmin can view as user' });
+  }
+
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(userId).select('_id').lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const code = createViewAsCode(userId);
+    const clientUrl = (process.env.CLIENT_URL || '').replace(/\/$/, '');
+    const viewAsUrl = `${clientUrl}/view-as?code=${code}`;
+
+    return res.status(200).json({
+      message: 'View as user link created',
+      viewAsUrl,
+      expiresIn: 300,
+    });
+  } catch (error) {
+    console.error('Get view-as link error:', error);
     return res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };

@@ -5,10 +5,15 @@ import crypto from 'crypto';
 import axios from 'axios';
 import sendEmail from '../utils/sendEmail.js';
 import mongoose from 'mongoose';
+import { consumeViewAsCode } from '../utils/viewAsStore.js';
 
 // Generate JWT token
 const generateAccessToken = (id, role) =>
   jwt.sign({ id, role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7d' });
+
+// Short-lived token for "View as User" (1 hour)
+const generateViewAsToken = (id, role) =>
+  jwt.sign({ id, role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
 
 // ======================== CONTROLLERS ========================
 
@@ -159,6 +164,36 @@ export const logoutUser = async (req, res) => {
   // Logout is handled client-side by clearing the access token
   // No server-side action needed
   res.json({ message: 'Logged out successfully' });
+};
+
+// Exchange one-time "View as User" code for access token (no auth required)
+export const exchangeViewAsCode = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ message: 'Code is required' });
+    }
+
+    const userId = consumeViewAsCode(code);
+    if (!userId) {
+      return res.status(400).json({ message: 'Invalid or expired code' });
+    }
+
+    const user = await User.findById(userId).select('_id role').lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const accessToken = generateViewAsToken(user._id.toString(), user.role);
+
+    return res.status(200).json({
+      message: 'View as user session started',
+      accessToken,
+    });
+  } catch (e) {
+    console.error('Exchange view-as code error:', e);
+    return res.status(500).json({ message: e.message });
+  }
 };
 
 // Basic user profile (MongoDB only) - for AuthContext and other components

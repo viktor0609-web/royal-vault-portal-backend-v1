@@ -8,6 +8,7 @@ import {
   resetUserPassword,
   toggleUserVerification,
   changeUserRole,
+  getViewAsUserLink,
   getUserStatistics,
   bulkUpdateUsers,
   bulkDeleteUsers,
@@ -53,6 +54,9 @@ router.delete('/:userId', authorizeSupaadmin(), deleteUser);
 
 // Reset user password (Supaadmin only)
 router.post('/:userId/reset-password', authorizeSupaadmin(), resetUserPassword);
+
+// Get "View as User" link (Supaadmin only) - opens in new tab as that user
+router.post('/:userId/view-as', authorizeSupaadmin(), getViewAsUserLink);
 
 // Toggle user verification status (Supaadmin only)
 router.patch('/:userId/verification', authorizeSupaadmin(), toggleUserVerification);

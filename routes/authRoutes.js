@@ -9,6 +9,7 @@ import {
   forgotPassword,
   resetPassword,
   updateProfile,
+  exchangeViewAsCode,
 } from '../controllers/authController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -18,6 +19,9 @@ router.post('/register', registerUser);
 router.post('/verify/:token', verifyEmail);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
+
+// Exchange one-time "View as User" code for token (no auth - used by new tab)
+router.post('/view-as/exchange', exchangeViewAsCode);
 
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
