@@ -236,6 +236,60 @@ export const getUserOrders = async (req, res) => {
   }
 };
 
+/**
+ * Get current user's order count (for sidebar: hide Orders link for leads)
+ * GET /api/orders/count
+ */
+export const getOrdersCount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (!HUBSPOT_PRIVATE_API_KEY) {
+      return res.status(500).json({ message: 'HubSpot API key not configured' });
+    }
+
+    const contactSearchResponse = await axios.post(
+      `${HUBSPOT_API_BASE}/objects/contacts/search`,
+      {
+        filterGroups: [
+          { filters: [{ propertyName: 'email', operator: 'EQ', value: user.email }] }
+        ],
+        properties: ['hs_object_id'],
+        limit: 1
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const contactId = contactSearchResponse.data.results?.[0]?.id;
+    if (!contactId) {
+      return res.status(200).json({ count: 0 });
+    }
+
+    const associationsResponse = await axios.get(
+      `${HUBSPOT_API_BASE}/objects/contacts/${contactId}/associations/deals`,
+      {
+        params: { limit: 100 },
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_PRIVATE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const dealIds = (associationsResponse.data.results || []).map((assoc) => assoc.id);
+    return res.status(200).json({ count: dealIds.length });
+  } catch (error) {
+    console.error('Error fetching orders count:', error.response?.data || error.message);
+    return res.status(500).json({ message: 'Error fetching orders count', error: error.message });
+  }
+};
 
 /**
  * Get payments for a specific deal or all payments for user
