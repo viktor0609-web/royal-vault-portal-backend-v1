@@ -7,6 +7,7 @@ const courseGroupSchema = new Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
     icon: { type: String, required: true },
+    sortOrder: { type: Number, default: 0 }, // Public display order
     courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
@@ -21,6 +22,7 @@ const courseSchema = new Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
     courseGroup: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseGroup', required: true },
+    sortOrder: { type: Number, default: 0 }, // Public display order within the group
     lectures: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lecture' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     resources: [{

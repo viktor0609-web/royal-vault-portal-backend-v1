@@ -101,10 +101,13 @@ export const createCourseGroup = async (req, res) => {
     }
 
     const createdBy = req.user._id;
+    const maxOrder = await CourseGroup.findOne().sort({ sortOrder: -1 }).select('sortOrder').lean();
+    const sortOrder = (maxOrder?.sortOrder ?? -1) + 1;
     const courseGroup = await CourseGroup.create({
       title,
       description,
       icon,
+      sortOrder,
       createdBy,
       displayOnPublicPage: req.body.displayOnPublicPage || false,
       hubSpotListIds: Array.isArray(hubSpotListIds) ? hubSpotListIds : []
@@ -166,6 +169,7 @@ export const getAllCourseGroups = async (req, res) => {
     // Build aggregation pipeline
     const pipeline = [
       { $match: matchStage },
+      { $sort: { sortOrder: 1 } },
       {
         $lookup: {
           from: 'users',
@@ -221,6 +225,7 @@ export const getAllCourseGroups = async (req, res) => {
                 title: 1,
                 description: 1,
                 courseGroup: 1,
+                sortOrder: 1,
                 lectures: 1,
                 createdBy: 1,
                 createdAt: 1,
@@ -234,6 +239,11 @@ export const getAllCourseGroups = async (req, res) => {
       };
 
       pipeline.push(courseLookup);
+      pipeline.push({
+        $addFields: {
+          courses: { $sortArray: { input: '$courses', sortBy: { sortOrder: 1 } } }
+        }
+      });
 
       // If search is provided, filter courses/lectures that match
       if (search) {
@@ -443,6 +453,13 @@ export const getCourseGroupById = async (req, res) => {
       }
     });
 
+    // Sort courses by sortOrder (public display order)
+    pipeline.push({
+      $addFields: {
+        courses: { $sortArray: { input: '$courses', sortBy: { sortOrder: 1 } } }
+      }
+    });
+
     const result = await CourseGroup.aggregate(pipeline);
 
     if (!result || result.length === 0) {
@@ -489,6 +506,28 @@ export const getCourseGroupById = async (req, res) => {
   }
 };
 
+
+// Reorder course groups (public display order)
+export const reorderCourseGroups = async (req, res) => {
+  try {
+    const { groupIds } = req.body;
+    if (!Array.isArray(groupIds)) {
+      return res.status(400).json({ message: 'groupIds must be an array' });
+    }
+    const updates = groupIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { sortOrder: index } }
+      }
+    }));
+    if (updates.length) {
+      await CourseGroup.bulkWrite(updates);
+    }
+    res.json({ message: 'Course group order updated' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Update CourseGroup
 export const updateCourseGroup = async (req, res) => {
@@ -581,6 +620,9 @@ export const createCourse = async (req, res) => {
       return res.status(404).json({ message: 'Course group not found' });
     }
 
+    const maxOrder = await Course.findOne({ courseGroup }).sort({ sortOrder: -1 }).select('sortOrder').lean();
+    const sortOrder = (maxOrder?.sortOrder ?? -1) + 1;
+
     // Migrate legacy ebook fields to resources if provided
     let finalResources = resources || [];
     if (ebookName && ebookUrl && (!resources || resources.length === 0)) {
@@ -595,6 +637,7 @@ export const createCourse = async (req, res) => {
       title,
       description,
       courseGroup,
+      sortOrder,
       lectures,
       createdBy,
       resources: finalResources,
@@ -805,6 +848,53 @@ export const getCourseById = async (req, res) => {
     if (error.name === 'CastError') {
       return res.status(404).json({ message: 'Course not found' });
     }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Reorder courses within a group (public display order)
+export const reorderCoursesInGroup = async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const { courseIds } = req.body;
+    if (!Array.isArray(courseIds)) {
+      return res.status(400).json({ message: 'courseIds must be an array' });
+    }
+    const group = await CourseGroup.findById(groupId);
+    if (!group) return res.status(404).json({ message: 'Course group not found' });
+    const updates = courseIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id, courseGroup: groupId },
+        update: { $set: { sortOrder: index } }
+      }
+    }));
+    if (updates.length) {
+      await Course.bulkWrite(updates);
+    }
+    res.json({ message: 'Course order updated' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Reorder lectures within a course (public display order)
+export const reorderLecturesInCourse = async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { lectureIds } = req.body;
+    if (!Array.isArray(lectureIds)) {
+      return res.status(400).json({ message: 'lectureIds must be an array' });
+    }
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+    const existingIds = new Set(course.lectures.map(l => l.toString()));
+    const validIds = lectureIds.filter(id => existingIds.has(String(id)));
+    if (validIds.length !== lectureIds.length || validIds.length !== existingIds.size) {
+      return res.status(400).json({ message: 'lectureIds must match exactly the course lectures' });
+    }
+    await Course.findByIdAndUpdate(courseId, { lectures: lectureIds });
+    res.json({ message: 'Lecture order updated' });
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };

@@ -3,13 +3,16 @@ import {
   createCourseGroup,
   getAllCourseGroups,
   getCourseGroupById,
+  reorderCourseGroups,
   updateCourseGroup,
   deleteCourseGroup,
+  reorderCoursesInGroup,
   createCourse,
   getAllCourses,
   getCourseById,
   updateCourse,
   deleteCourse,
+  reorderLecturesInCourse,
   createLecture,
   getAllLectures,
   getLectureById,
@@ -25,7 +28,9 @@ const router = express.Router();
 router.get('/groups', optionalProtect, getAllCourseGroups); // Get all course groups (optional auth for HubSpot list filtering)
 router.get('/groups/:id', optionalProtect, getCourseGroupById); // Get a course group by ID (optional auth for HubSpot list filtering)
 router.post('/groups', protect, authorize('admin'), createCourseGroup); // Create a new course group
+router.put('/groups/reorder', protect, authorize('admin'), reorderCourseGroups); // Reorder groups (public display)
 router.put('/groups/:id', protect, authorize('admin'), updateCourseGroup); // Update a course group
+router.put('/groups/:id/courses/reorder', protect, authorize('admin'), reorderCoursesInGroup); // Reorder courses (public display)
 router.delete('/groups/:id', protect, authorize('admin'), deleteCourseGroup); // Delete a course group
 
 // Course routes
@@ -33,6 +38,7 @@ router.get('/courses', getAllCourses); // Get all courses
 router.get('/courses/:id', getCourseById); // Get a course by ID
 router.post('/courses/:groupId', protect, authorize('admin'), createCourse); // Create a new course
 router.put('/courses/:id', protect, authorize('admin'), updateCourse); // Update a course
+router.put('/courses/:id/lectures/reorder', protect, authorize('admin'), reorderLecturesInCourse); // Reorder lectures (public display)
 router.delete('/courses/:id', protect, authorize('admin'), deleteCourse); // Delete a course
 
 // Lecture routes
