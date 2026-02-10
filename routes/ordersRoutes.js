@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getUserOrders,
+  getOrdersCount,
   getPayments,
   getSubscriptions,
   getAdminUserOrders,
@@ -12,6 +13,9 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
+
+// Get user's order count (for UI: hide Orders link for leads)
+router.get('/count', getOrdersCount);
 
 // Get user's orders (deals)
 router.get('/', getUserOrders);
