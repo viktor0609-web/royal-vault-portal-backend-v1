@@ -18,11 +18,26 @@ import {
   getLectureById,
   updateLecture,
   deleteLecture,
+  moveLectureToCourse,
   completeLecture,
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  reorderCategories,
+  getCourseGroupsByCategory,
 } from '../controllers/courseController.js';
 import { protect, authorize, optionalProtect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Course categories (sections on main course page)
+router.get('/categories', getAllCategories); // Get all categories (public for display)
+router.get('/categories/:categoryId/groups', optionalProtect, getCourseGroupsByCategory); // Get groups in a category (for "See all" page)
+router.post('/categories', protect, authorize('admin'), createCategory);
+router.put('/categories/reorder', protect, authorize('admin'), reorderCategories);
+router.put('/categories/:id', protect, authorize('admin'), updateCategory);
+router.delete('/categories/:id', protect, authorize('admin'), deleteCategory);
 
 // CourseGroup routes
 router.get('/groups', optionalProtect, getAllCourseGroups); // Get all course groups (optional auth for HubSpot list filtering)
@@ -47,6 +62,7 @@ router.get('/lectures/:id', protect, getLectureById); // Get a lecture by ID
 router.post('/lectures', protect, authorize('admin'), createLecture); // Create a new lecture
 router.put('/lectures/:id', protect, authorize('admin'), updateLecture); // Update a lecture
 router.delete('/lectures/:id', protect, authorize('admin'), deleteLecture); // Delete a lecture
+router.post('/lectures/:id/move', protect, authorize('admin'), moveLectureToCourse); // Move lecture to another course
 router.post('/lectures/:id/complete', protect, completeLecture); // Mark a lecture as completed
 
 export default router;
