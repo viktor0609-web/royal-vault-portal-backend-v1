@@ -93,11 +93,11 @@ const isUserInHubSpotLists = async (userEmail, listIds) => {
 // Create a new CourseGroup
 export const createCourseGroup = async (req, res) => {
   try {
-    const { title, description, icon, hubSpotListIds } = req.body;
+    const { title, description, hubSpotListIds } = req.body;
 
     // Validation
-    if (!title || !description || !icon) {
-      return res.status(400).json({ message: 'Title, description, and icon are required' });
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Title and description are required' });
     }
 
     const createdBy = req.user._id;
@@ -106,7 +106,6 @@ export const createCourseGroup = async (req, res) => {
     const courseGroup = await CourseGroup.create({
       title,
       description,
-      icon,
       sortOrder,
       createdBy,
       displayOnPublicPage: req.body.displayOnPublicPage || false,
@@ -552,7 +551,7 @@ export const reorderCourseGroups = async (req, res) => {
 // Update CourseGroup
 export const updateCourseGroup = async (req, res) => {
   try {
-    const { title, description, icon, hubSpotListIds, category, displayOnPublicPage } = req.body;
+    const { title, description, hubSpotListIds, category, displayOnPublicPage } = req.body;
 
     // Validation
     if (title !== undefined && !title.trim()) {
@@ -561,15 +560,11 @@ export const updateCourseGroup = async (req, res) => {
     if (description !== undefined && !description.trim()) {
       return res.status(400).json({ message: 'Description cannot be empty' });
     }
-    if (icon !== undefined && !icon.trim()) {
-      return res.status(400).json({ message: 'Icon cannot be empty' });
-    }
 
     // Prepare update data (only allowed fields)
     const updateData = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
-    if (icon !== undefined) updateData.icon = icon;
     if (category !== undefined) updateData.category = category || null;
     if (displayOnPublicPage !== undefined) updateData.displayOnPublicPage = !!displayOnPublicPage;
     if (hubSpotListIds !== undefined) {
@@ -671,7 +666,7 @@ export const createCourse = async (req, res) => {
     });
 
     await course.populate('createdBy', 'name email');
-    await course.populate('courseGroup', 'title description icon');
+    await course.populate('courseGroup', 'title description');
 
     res.status(201).json(course);
   } catch (error) {
@@ -720,7 +715,7 @@ export const getAllCourses = async (req, res) => {
           localField: 'courseGroup',
           foreignField: '_id',
           as: 'courseGroup',
-          pipeline: [{ $project: { title: 1, description: 1, icon: 1 } }]
+          pipeline: [{ $project: { title: 1, description: 1 } }]
         }
       },
       { $unwind: { path: '$courseGroup', preserveNullAndEmptyArrays: true } }
@@ -815,7 +810,7 @@ export const getCourseById = async (req, res) => {
           as: 'courseGroup',
           pipeline: [
             ...(isPublicOnly ? [{ $match: { displayOnPublicPage: true } }] : []),
-            { $project: { title: 1, description: 1, icon: 1, displayOnPublicPage: 1 } }
+            { $project: { title: 1, description: 1, displayOnPublicPage: 1 } }
           ]
         }
       },

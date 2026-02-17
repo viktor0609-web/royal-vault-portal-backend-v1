@@ -17,7 +17,6 @@ const courseGroupSchema = new Schema(
   {
     title: { type: String, required: true },
     description: { type: String, required: true },
-    icon: { type: String, required: true },
     sortOrder: { type: Number, default: 0 }, // Public display order
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseCategory' }, // Optional section/category
     courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
