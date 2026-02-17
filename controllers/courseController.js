@@ -922,9 +922,42 @@ export const updateCourse = async (req, res) => {
   try {
     const updated = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('createdBy', 'name email')
-      .populate('courseGroup', 'title description icon')
+      .populate('courseGroup', 'title description')
       .populate('lectures', 'title description content videoUrl relatedFiles createdBy createdAt completedBy');
     if (!updated) return res.status(404).json({ message: 'Course not found' });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Move course to another course group
+export const moveCourseToGroup = async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { targetGroupId } = req.body;
+
+    if (!targetGroupId) {
+      return res.status(400).json({ message: 'targetGroupId is required' });
+    }
+
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    const targetGroup = await CourseGroup.findById(targetGroupId);
+    if (!targetGroup) return res.status(404).json({ message: 'Target course group not found' });
+
+    if (course.courseGroup.toString() === targetGroupId) {
+      return res.status(400).json({ message: 'Course is already in this group' });
+    }
+
+    const maxOrder = await Course.findOne({ courseGroup: targetGroupId }).sort({ sortOrder: -1 }).select('sortOrder').lean();
+    const sortOrder = (maxOrder?.sortOrder ?? -1) + 1;
+
+    await Course.findByIdAndUpdate(courseId, { courseGroup: targetGroupId, sortOrder });
+    const updated = await Course.findById(courseId)
+      .populate('createdBy', 'name email')
+      .populate('courseGroup', 'title description');
     res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });

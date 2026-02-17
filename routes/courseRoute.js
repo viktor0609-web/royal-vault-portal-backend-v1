@@ -11,6 +11,7 @@ import {
   getAllCourses,
   getCourseById,
   updateCourse,
+  moveCourseToGroup,
   deleteCourse,
   reorderLecturesInCourse,
   createLecture,
@@ -53,6 +54,7 @@ router.get('/courses', getAllCourses); // Get all courses
 router.get('/courses/:id', getCourseById); // Get a course by ID
 router.post('/courses/:groupId', protect, authorize('admin'), createCourse); // Create a new course
 router.put('/courses/:id', protect, authorize('admin'), updateCourse); // Update a course
+router.post('/courses/:id/move', protect, authorize('admin'), moveCourseToGroup); // Move course to another group
 router.put('/courses/:id/lectures/reorder', protect, authorize('admin'), reorderLecturesInCourse); // Reorder lectures (public display)
 router.delete('/courses/:id', protect, authorize('admin'), deleteCourse); // Delete a course
 
