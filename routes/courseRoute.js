@@ -21,10 +21,22 @@ import {
   deleteLecture,
   moveLectureToCourse,
   completeLecture,
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  reorderCategories,
 } from '../controllers/courseController.js';
 import { protect, authorize, optionalProtect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Course categories (for grouping course groups)
+router.get('/categories', getAllCategories);
+router.post('/categories', protect, authorize('admin'), createCategory);
+router.put('/categories/reorder', protect, authorize('admin'), reorderCategories);
+router.put('/categories/:id', protect, authorize('admin'), updateCategory);
+router.delete('/categories/:id', protect, authorize('admin'), deleteCategory);
 
 // CourseGroup routes
 router.get('/groups', optionalProtect, getAllCourseGroups); // Get all course groups (optional auth for HubSpot list filtering)
