@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { CourseGroup, Course, Lecture, CourseCategory } from '../models/Course.js';
+import { CourseGroup, Course, Lecture } from '../models/Course.js';
 import User from '../models/User.js';
 import axios from 'axios';
 
@@ -178,17 +178,7 @@ export const getAllCourseGroups = async (req, res) => {
           pipeline: [{ $project: { firstName: 1, lastName: 1 } }]
         }
       },
-      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: 'coursecategories',
-          localField: 'category',
-          foreignField: '_id',
-          as: 'category',
-          pipeline: [{ $project: { title: 1, description: 1, sortOrder: 1 } }]
-        }
-      },
-      { $addFields: { category: { $arrayElemAt: ['$category', 0] } } }
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
     ];
 
     // Add courses lookup based on fields parameter
@@ -403,17 +393,7 @@ export const getCourseGroupById = async (req, res) => {
           pipeline: [{ $project: { name: 1, email: 1 } }]
         }
       },
-      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: 'coursecategories',
-          localField: 'category',
-          foreignField: '_id',
-          as: 'category',
-          pipeline: [{ $project: { title: 1, description: 1, sortOrder: 1 } }]
-        }
-      },
-      { $addFields: { category: { $arrayElemAt: ['$category', 0] } } }
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } }
     ];
 
     // Add courses lookup
@@ -551,7 +531,7 @@ export const reorderCourseGroups = async (req, res) => {
 // Update CourseGroup
 export const updateCourseGroup = async (req, res) => {
   try {
-    const { title, description, hubSpotListIds, category, displayOnPublicPage } = req.body;
+    const { title, description, hubSpotListIds, displayOnPublicPage } = req.body;
 
     // Validation
     if (title !== undefined && !title.trim()) {
@@ -565,7 +545,6 @@ export const updateCourseGroup = async (req, res) => {
     const updateData = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
-    if (category !== undefined) updateData.category = category || null;
     if (displayOnPublicPage !== undefined) updateData.displayOnPublicPage = !!displayOnPublicPage;
     if (hubSpotListIds !== undefined) {
       updateData.hubSpotListIds = Array.isArray(hubSpotListIds) ? hubSpotListIds : [];
@@ -1298,102 +1277,6 @@ export const completeLecture = async (req, res) => {
       await lecture.save();
       res.json({ message: 'Lecture marked as completed', completed: true });
     }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// ------------------ Course Categories (sections on main course page) ------------------
-
-export const getAllCategories = async (req, res) => {
-  try {
-    const categories = await CourseCategory.find()
-      .sort({ sortOrder: 1 })
-      .lean();
-    res.json({ data: categories });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const createCategory = async (req, res) => {
-  try {
-    const { title, description, sortOrder } = req.body;
-    if (!title || !title.trim()) {
-      return res.status(400).json({ message: 'Title is required' });
-    }
-    const count = await CourseCategory.countDocuments();
-    const category = await CourseCategory.create({
-      title: title.trim(),
-      description: (description || '').trim(),
-      sortOrder: typeof sortOrder === 'number' ? sortOrder : count,
-      createdBy: req.user._id,
-    });
-    res.status(201).json(category);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const updateCategory = async (req, res) => {
-  try {
-    const { title, description, sortOrder } = req.body;
-    const updateData = {};
-    if (title !== undefined) updateData.title = title.trim();
-    if (description !== undefined) updateData.description = description.trim();
-    if (typeof sortOrder === 'number') updateData.sortOrder = sortOrder;
-    const updated = await CourseCategory.findByIdAndUpdate(req.params.id, updateData, { new: true });
-    if (!updated) return res.status(404).json({ message: 'Category not found' });
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const deleteCategory = async (req, res) => {
-  try {
-    const cat = await CourseCategory.findByIdAndDelete(req.params.id);
-    if (!cat) return res.status(404).json({ message: 'Category not found' });
-    await CourseGroup.updateMany({ category: cat._id }, { $unset: { category: 1 } });
-    res.json({ message: 'Category deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const reorderCategories = async (req, res) => {
-  try {
-    const { categoryIds } = req.body;
-    if (!Array.isArray(categoryIds)) {
-      return res.status(400).json({ message: 'categoryIds must be an array' });
-    }
-    const updates = categoryIds.map((id, index) => ({
-      updateOne: {
-        filter: { _id: id },
-        update: { $set: { sortOrder: index } },
-      },
-    }));
-    if (updates.length) await CourseCategory.bulkWrite(updates);
-    res.json({ message: 'Category order updated' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Get course groups by category (for public "See all" section page)
-export const getCourseGroupsByCategory = async (req, res) => {
-  try {
-    const { categoryId } = req.params;
-    const { publicOnly = 'true' } = req.query;
-    const isPublicOnly = publicOnly === 'true';
-    const matchStage = { category: new mongoose.Types.ObjectId(categoryId) };
-    if (isPublicOnly) matchStage.displayOnPublicPage = true;
-
-    const groups = await CourseGroup.find(matchStage)
-      .sort({ sortOrder: 1 })
-      .populate('category', 'title description sortOrder')
-      .lean();
-    res.json({ data: groups });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

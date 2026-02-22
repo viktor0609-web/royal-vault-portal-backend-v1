@@ -1,24 +1,12 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// CourseCategory Schema (sections on main course page - groups course groups)
-const courseCategorySchema = new Schema(
-  {
-    title: { type: String, required: true },
-    description: { type: String, default: '' },
-    sortOrder: { type: Number, default: 0 },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  },
-  { timestamps: true }
-);
-
 // CourseGroup Schema (now bottom level)
 const courseGroupSchema = new Schema(
   {
     title: { type: String, required: true },
     description: { type: String, required: true },
     sortOrder: { type: Number, default: 0 }, // Public display order
-    category: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseCategory' }, // Optional section/category
     courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     displayOnPublicPage: { type: Boolean, default: false }, // Whether to display on public pages
@@ -68,8 +56,6 @@ const lectureSchema = new Schema(
 );
 
 // Add indexes for performance optimization
-courseCategorySchema.index({ sortOrder: 1 });
-courseGroupSchema.index({ category: 1 });
 courseGroupSchema.index({ createdBy: 1 });
 courseGroupSchema.index({ title: 'text', description: 'text' }); // Text search index
 courseGroupSchema.index({ displayOnPublicPage: 1 }); // Critical: used for filtering
@@ -105,6 +91,5 @@ lectureSchema.pre('save', function(next) {
 const Lecture = mongoose.model('Lecture', lectureSchema);
 const Course = mongoose.model('Course', courseSchema);
 const CourseGroup = mongoose.model('CourseGroup', courseGroupSchema);
-const CourseCategory = mongoose.model('CourseCategory', courseCategorySchema);
 
-export { Lecture, Course, CourseGroup, CourseCategory };
+export { Lecture, Course, CourseGroup };
